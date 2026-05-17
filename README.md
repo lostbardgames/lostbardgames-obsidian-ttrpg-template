@@ -120,6 +120,7 @@ The importer never overwrites existing notes — safe to re-run at any time.
 | `1.Tools/Homepage.md` | Campaign dashboard — party tracker, world overview, inspiration tables |
 | `1.Tools/GM Screen.md` | Session tool — initiative tracker, rules reference, live notes |
 | `1.Tools/Buttons.md` | All quick-create buttons organized by category |
+| `HOW TO USE.md` | Comprehensive guide covering every note type, all fields explained, written for Obsidian beginners |
 
 ---
 
