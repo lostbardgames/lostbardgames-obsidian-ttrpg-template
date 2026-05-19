@@ -190,12 +190,12 @@ The updater in older vault versions has a bug that prevents it from running. You
 
 **Terminal (fastest):**
 ```bash
-curl -L "https://raw.githubusercontent.com/lostbardgames/obsidian-ttrpg-vault/main/z_Templates/Scripts/UpdateVault.js" \
+curl -L "https://raw.githubusercontent.com/lostbardgames/lostbardgames-obsidian-ttrpg-template/main/z_Templates/Scripts/UpdateVault.js" \
   -o "<path-to-your-vault>/z_Templates/Scripts/UpdateVault.js"
 ```
 
 **Manual download:**
-1. Open this URL in your browser: `https://raw.githubusercontent.com/lostbardgames/obsidian-ttrpg-vault/main/z_Templates/Scripts/UpdateVault.js`
+1. Open this URL in your browser: `https://raw.githubusercontent.com/lostbardgames/lostbardgames-obsidian-ttrpg-template/main/z_Templates/Scripts/UpdateVault.js`
 2. Save the page (Cmd+S / Ctrl+S) as `UpdateVault.js`
 3. Replace the file at `<your-vault>/z_Templates/Scripts/UpdateVault.js`
 4. Reload Obsidian
