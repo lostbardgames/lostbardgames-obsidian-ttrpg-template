@@ -142,14 +142,18 @@ jobs:
       - name: Build release zip
         run: |
           TAG="${GITHUB_REF_NAME}"
-          OUTPUT="${GITHUB_WORKSPACE}/TTRPG-Vault-${TAG}.zip"
+          ZIP_NAME="TTRPG-Vault-${TAG}.zip"
+          # Write to /tmp first so os.walk never picks up the growing zip file
+          TMP_OUTPUT="/tmp/${ZIP_NAME}"
+          FINAL_OUTPUT="${GITHUB_WORKSPACE}/${ZIP_NAME}"
 
           python3 - <<PYEOF
-          import os, zipfile, fnmatch
+          import os, zipfile, fnmatch, shutil
 
-          OUTPUT      = "$OUTPUT"
-          WORKSPACE   = "$GITHUB_WORKSPACE"
-          FOLDER_NAME = "LBG TTRPG GM Template"
+          TMP_OUTPUT    = "$TMP_OUTPUT"
+          FINAL_OUTPUT  = "$FINAL_OUTPUT"
+          WORKSPACE     = "$GITHUB_WORKSPACE"
+          FOLDER_NAME   = "LBG TTRPG GM Template"
 
           SKIP_DIRS = {".git", ".github", "__pycache__", ".vault-backups", ".trash"}
           SKIP_PATS = [
@@ -162,9 +166,10 @@ jobs:
           ]
 
           os.chdir(WORKSPACE)
+          # Write zip to /tmp so the growing file is never inside the walked tree
           # ZIP_STORED (no compression) keeps build fast — plugin JS is already
           # minified and barely compresses, so the size difference is negligible.
-          with zipfile.ZipFile(OUTPUT, "w", zipfile.ZIP_STORED) as zf:
+          with zipfile.ZipFile(TMP_OUTPUT, "w", zipfile.ZIP_STORED) as zf:
               for root, dirs, files in os.walk("."):
                   dirs[:] = [d for d in sorted(dirs) if d not in SKIP_DIRS]
                   for name in sorted(files):
@@ -174,11 +179,12 @@ jobs:
                           continue
                       zf.write(abs_path, f"{FOLDER_NAME}/{rel}")
 
-          size_mb = os.path.getsize(OUTPUT) // (1024 * 1024)
-          print(f"Built {os.path.basename(OUTPUT)} ({size_mb} MB)")
+          shutil.move(TMP_OUTPUT, FINAL_OUTPUT)
+          size_mb = os.path.getsize(FINAL_OUTPUT) // (1024 * 1024)
+          print(f"Built {os.path.basename(FINAL_OUTPUT)} ({size_mb} MB)")
           PYEOF
 
-          echo "ZIP_NAME=TTRPG-Vault-${TAG}.zip" >> "$GITHUB_ENV"
+          echo "ZIP_NAME=${ZIP_NAME}" >> "$GITHUB_ENV"
 
       # ── Create GitHub Release and upload assets ───────────────────────────────
       - name: Create GitHub Release
