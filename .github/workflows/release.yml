@@ -1,0 +1,193 @@
+name: Build & Publish Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Generate files.json manifest ─────────────────────────────────────────
+      # NOTE: The repo root IS the vault root — no TTRPG/ subfolder in the repo.
+      # All manifest paths are relative to the vault root (e.g. "UpdateVault.py").
+      - name: Generate files.json manifest
+        run: |
+          python3 - <<'EOF'
+          import os
+          import json
+          import hashlib
+          from datetime import datetime, timezone
+
+          TAG     = os.environ.get("GITHUB_REF_NAME", "unknown")
+          VERSION = TAG.lstrip("v")
+
+          # Repo root IS the vault root
+          VAULT_DIR = "."
+
+          # Paths always updated (relative to vault root)
+          ALWAYS = [
+              "START HERE.md",
+              "HOW TO USE.md",
+              "import_5etools.py",
+              "ImportDnDBeyond.py",
+              "UpdateVault.py",
+              ".obsidian/snippets/TTRPG-Icons.css",
+              ".obsidian/snippets/TTRPG-Folders.css",
+              "z_Templates",   # directory — entire tree replaced
+          ]
+
+          # Paths updated only when user opts in
+          USER_OPTIONAL = [
+              "1.Tools/Homepage.md",
+              "1.Tools/Buttons.md",
+              "1.Tools/GM Screen.md",
+          ]
+
+          # Directories the updater must NEVER touch
+          PROTECTED_DIRS = [
+              "Characters", "Organizations", "Worlds", "Settlements",
+              "Districts", "Areas", "POIs", "Parties", "Lore", "Possessions",
+          ]
+
+          # Files inside .obsidian/ the updater IS allowed to touch
+          OBSIDIAN_ALLOWED = [
+              ".obsidian/snippets/TTRPG-Icons.css",
+              ".obsidian/snippets/TTRPG-Folders.css",
+          ]
+
+          # Files users may customize — always backed up before overwriting
+          USER_CUSTOMIZABLE = [
+              "1.Tools/Homepage.md",
+              "1.Tools/Buttons.md",
+              "1.Tools/GM Screen.md",
+              "HOW TO USE.md",
+              "START HERE.md",
+          ]
+
+          # Dirs to skip entirely during walk
+          SKIP_DIRS = {
+              ".git", ".github", "__pycache__",
+              ".vault-backups", ".trash",
+          }
+          # Path prefixes to exclude (forward-slash normalized)
+          SKIP_PREFIXES = (
+              ".obsidian/workspace",
+              ".obsidian/ddb-config.json",
+              ".obsidian/plugins/",
+              ".obsidian/themes/",
+          )
+          SKIP_SUFFIXES = (".pyc", ".bak", ".DS_Store")
+          # Never include version.json — stamped fresh at release time
+          SKIP_EXACT = {"version.json"}
+
+          def sha256(path):
+              h = hashlib.sha256()
+              with open(path, "rb") as f:
+                  for chunk in iter(lambda: f.read(65536), b""):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          files = {}
+          for root, dirs, filenames in os.walk(VAULT_DIR):
+              dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS)
+              for name in sorted(filenames):
+                  abs_path = os.path.join(root, name)
+                  rel = os.path.relpath(abs_path, VAULT_DIR).replace("\\", "/")
+                  if rel in SKIP_EXACT:
+                      continue
+                  if any(rel.startswith(p) for p in SKIP_PREFIXES):
+                      continue
+                  if any(rel.endswith(s) for s in SKIP_SUFFIXES):
+                      continue
+                  files[rel] = sha256(abs_path)
+
+          manifest = {
+              "version":  VERSION,
+              "released": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "files":    files,
+              "managed": {
+                  "always":        ALWAYS,
+                  "user_optional": USER_OPTIONAL,
+              },
+              "protected_dirs":    PROTECTED_DIRS,
+              "obsidian_allowed":  OBSIDIAN_ALLOWED,
+              "user_customizable": USER_CUSTOMIZABLE,
+          }
+
+          with open("files.json", "w") as fh:
+              json.dump(manifest, fh, indent=2)
+
+          print(f"Manifest written: {len(files)} files, version {VERSION}")
+          EOF
+
+      # ── Stamp version.json ────────────────────────────────────────────────────
+      - name: Stamp version.json
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "{\"version\": \"${VERSION}\"}" > version.json
+
+      # ── Build release zip ─────────────────────────────────────────────────────
+      # Wraps vault contents inside a TTRPG/ folder so users can extract and
+      # use the folder directly as their Obsidian vault.
+      - name: Build release zip
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          OUTPUT="${GITHUB_WORKSPACE}/TTRPG-Vault-${TAG}.zip"
+
+          python3 - <<PYEOF
+          import os, zipfile, fnmatch
+
+          OUTPUT    = "$OUTPUT"
+          WORKSPACE = "$GITHUB_WORKSPACE"
+
+          SKIP_DIRS = {".git", ".github", "__pycache__", ".vault-backups", ".trash"}
+          SKIP_PATS = [
+              ".obsidian/workspace*",
+              ".obsidian/ddb-config.json",
+              ".obsidian/plugins/*",
+              ".obsidian/themes/*",
+              "*.DS_Store",
+              "*.pyc",
+              "*.bak",
+              "z_Uncategoried/*",
+          ]
+
+          os.chdir(WORKSPACE)
+          with zipfile.ZipFile(OUTPUT, "w", zipfile.ZIP_DEFLATED) as zf:
+              for root, dirs, files in os.walk("."):
+                  dirs[:] = [d for d in sorted(dirs) if d not in SKIP_DIRS]
+                  for name in sorted(files):
+                      abs_path = os.path.join(root, name)
+                      rel = os.path.relpath(abs_path, ".").replace("\\\\", "/")
+                      if any(fnmatch.fnmatch(rel, p) for p in SKIP_PATS):
+                          continue
+                      zf.write(abs_path, f"TTRPG/{rel}")
+
+          size_mb = os.path.getsize(OUTPUT) // (1024 * 1024)
+          print(f"Built {os.path.basename(OUTPUT)} ({size_mb} MB)")
+          PYEOF
+
+          echo "ZIP_NAME=TTRPG-Vault-${TAG}.zip" >> "$GITHUB_ENV"
+
+      # ── Create GitHub Release and upload assets ───────────────────────────────
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "TTRPG Vault ${GITHUB_REF_NAME}" \
+            --notes "See release notes." \
+            --draft=false \
+            --prerelease=false \
+            "${GITHUB_WORKSPACE}/${ZIP_NAME}" \
+            "${GITHUB_WORKSPACE}/files.json"
