@@ -24,7 +24,7 @@ import urllib.request
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
-REPO              = "lostbardgames/lostbardgames-obsidian-ttrpg-template"
+REPO              = "lostbardgames/lostbardgames-obsidian-ttrpg-gm-template"
 RELEASES_API      = f"https://api.github.com/repos/{REPO}/releases/latest"
 RELEASES_LIST_API = f"https://api.github.com/repos/{REPO}/releases"
 RAW_BASE          = f"https://raw.githubusercontent.com/{REPO}"
