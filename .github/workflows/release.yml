@@ -155,8 +155,6 @@ jobs:
           SKIP_PATS = [
               ".obsidian/workspace*",
               ".obsidian/ddb-config.json",
-              ".obsidian/plugins/*",
-              ".obsidian/themes/*",
               "*.DS_Store",
               "*.pyc",
               "*.bak",
@@ -164,7 +162,9 @@ jobs:
           ]
 
           os.chdir(WORKSPACE)
-          with zipfile.ZipFile(OUTPUT, "w", zipfile.ZIP_DEFLATED) as zf:
+          # ZIP_STORED (no compression) keeps build fast — plugin JS is already
+          # minified and barely compresses, so the size difference is negligible.
+          with zipfile.ZipFile(OUTPUT, "w", zipfile.ZIP_STORED) as zf:
               for root, dirs, files in os.walk("."):
                   dirs[:] = [d for d in sorted(dirs) if d not in SKIP_DIRS]
                   for name in sorted(files):
