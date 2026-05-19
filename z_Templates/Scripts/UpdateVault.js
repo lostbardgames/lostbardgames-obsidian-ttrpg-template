@@ -1,121 +1,156 @@
-const REPO    = "lostbardgames/obsidian-ttrpg-vault";
-const API_URL = `https://api.github.com/repos/${REPO}/releases/latest`;
+// ── Config ────────────────────────────────────────────────────────────────────
 
-// ── Version helpers ────────────────────────────────────────────────────────
+const PYTHON_SCRIPT = "UpdateVault.py"; // relative to vault root
 
-function parseVersion(tag) {
-    // "v1.0.3-beta" → "1.0.3"
-    return String(tag).replace(/^v/, "").replace(/-[a-z]+$/i, "");
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Run UpdateVault.py and return the parsed JSON result.
+ * Progress lines emitted to stderr are silently consumed.
+ * Throws if the process errors or produces no JSON.
+ */
+async function runPython(vaultPath, args) {
+    const { exec }      = require("child_process");
+    const { promisify } = require("util");
+    const execAsync     = promisify(exec);
+
+    const quotedArgs = args
+        .map(a => `"${String(a).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`)
+        .join(" ");
+    const cmd = `python3 "${vaultPath}/${PYTHON_SCRIPT}" ${quotedArgs}`;
+
+    const { stdout } = await execAsync(cmd, { maxBuffer: 10 * 1024 * 1024 });
+
+    // The last non-empty stdout line is always the JSON result
+    const lines = stdout.trim().split("\n").filter(Boolean);
+    return JSON.parse(lines[lines.length - 1]);
 }
 
-function isNewer(candidate, current) {
-    const a = parseVersion(candidate).split(".").map(Number);
-    const b = parseVersion(current).split(".").map(Number);
-    for (let i = 0; i < 3; i++) {
-        if ((a[i] || 0) > (b[i] || 0)) return true;
-        if ((a[i] || 0) < (b[i] || 0)) return false;
-    }
-    return false;
-}
-
-// ── Update prompt (QuickAdd-compatible — no require("obsidian") needed) ────
-
-async function showUpdatePrompt(qa, info) {
-    // Show changelog as a persistent notice so it's readable while the prompt is open
-    new Notice(
-        `Update available: ${info.currentVersion} → ${info.latestTag}\n\nWhat's New:\n${info.changelog || "No changelog provided."}`,
-        20000
-    );
-
-    const proceed = await qa.yesNoPrompt(
-        `Update vault from v${info.currentVersion} to ${info.latestTag}?`
-    );
-    if (!proceed) return null;
-
-    const updateTools = await qa.yesNoPrompt(
-        "Also update tool files? (Homepage, Buttons, GM Screen)\nThese will be backed up as .bak first."
-    );
-    return updateTools;
-}
-
-// ── Main ───────────────────────────────────────────────────────────────────
+// ── Main ───────────────────────────────────────────────────────────────────────
 
 module.exports = async (params) => {
     const { app, quickAddApi: qa } = params;
     const vaultPath = app.vault.adapter.basePath;
 
-    // Read installed version
-    let currentVersion = "0.0.0";
-    try {
-        const raw = await app.vault.adapter.read("version.json");
-        currentVersion = JSON.parse(raw).version;
-    } catch (_) {}
-
+    // ── Step A: Check for updates ─────────────────────────────────────────────
     new Notice("Checking for updates…");
 
-    // Fetch latest release from GitHub
-    let release;
+    let check;
     try {
-        const res = await fetch(API_URL, {
-            headers: { "User-Agent": "obsidian-ttrpg-vault-updater" }
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        release = await res.json();
+        // Single arg: vault_path. Python reads version.json and fetches GitHub.
+        check = await runPython(vaultPath, [vaultPath]);
     } catch (e) {
-        new Notice(`❌ Could not reach GitHub: ${e.message}`, 8000);
+        new Notice(`❌ Update check failed: ${e.message}`, 10000);
+        console.error("UpdateVault check error:", e);
         return;
     }
 
-    const latestTag  = release.tag_name;
-    const newVersion = parseVersion(latestTag);
-
-    if (!isNewer(latestTag, currentVersion)) {
-        new Notice(`✅ Already up to date (v${currentVersion})`);
+    if (check.status === "failed") {
+        new Notice(`❌ Update check failed: ${check.error}`, 10000);
         return;
     }
 
-    // Find zip asset
-    const zipAsset = (release.assets || []).find(a => a.name.endsWith(".zip"));
-    if (!zipAsset) {
-        new Notice("❌ No zip found in the latest release.", 8000);
+    if (check.status === "up_to_date") {
+        new Notice(`✅ Already up to date (v${check.current_version})`);
         return;
     }
 
-    // Show prompt and wait for user decision
-    const updateTools = await showUpdatePrompt(qa, {
-        currentVersion,
-        latestTag,
-        changelog: release.body
-    });
+    // ── status === "update_available" ─────────────────────────────────────────
 
-    if (updateTools === null) return; // user cancelled
+    // Show changelog as a persistent notice — visible while prompts are open
+    const changelog = check.changelog
+        ? check.changelog.slice(0, 800) + (check.changelog.length > 800 ? "…" : "")
+        : "No changelog provided.";
 
-    new Notice("⬇️ Downloading update…");
+    new Notice(
+        `Update available: v${check.current_version} → ${check.latest_tag}\n\nWhat's New:\n${changelog}`,
+        20000
+    );
 
+    // ── Surface customization warnings before asking to proceed ───────────────
+    const customized = (check.customized_files || []).filter(f => f.has_local_changes);
+    if (customized.length > 0) {
+        const names = customized.map(f => f.path.split("/").pop()).join(", ");
+        new Notice(
+            `⚠️ Customized files detected — these will be backed up before updating:\n${names}\n\n` +
+            `Find backups in .vault-backups/${check.current_version}/ after the update.`,
+            15000
+        );
+    }
+
+    // Build a summary of what will change
+    const alwaysCount   = (check.files_to_update   || []).length;
+    const optionalCount = (check.optional_to_update || []).length;
+
+    let filesSummary = `${alwaysCount} file(s) will be updated automatically.`;
+    if (optionalCount > 0) {
+        filesSummary += `\n${optionalCount} optional tool file(s) also available.`;
+    }
+
+    const proceed = await qa.yesNoPrompt(
+        `Update vault from v${check.current_version} to ${check.latest_tag}?\n\n${filesSummary}`
+    );
+    if (!proceed) return;
+
+    // ── Ask about optional tool files ─────────────────────────────────────────
+    let updateTools = false;
+    if (optionalCount > 0) {
+        const optNames = (check.optional_to_update || [])
+            .map(f => f.split("/").pop())
+            .join(", ");
+        updateTools = await qa.yesNoPrompt(
+            `Also update tool files? (${optNames})\n` +
+            "Your current versions will be backed up to .vault-backups/ first."
+        );
+        if (updateTools === null || updateTools === undefined) return;
+    }
+
+    // ── Step B: Apply update ──────────────────────────────────────────────────
+    new Notice("⬇️  Downloading and applying update…");
+
+    let result;
     try {
-        const { exec }    = require("child_process");
-        const { promisify } = require("util");
-        const execAsync   = promisify(exec);
-
-        const cmd = `python3 "${vaultPath}/UpdateVault.py" "${vaultPath}" "${zipAsset.browser_download_url}" "${updateTools}" "${newVersion}"`;
-        const { stdout } = await execAsync(cmd, { maxBuffer: 10 * 1024 * 1024 });
-
-        // Last line of stdout is the JSON result
-        const lines  = stdout.trim().split("\n");
-        const result = JSON.parse(lines[lines.length - 1]);
-
-        const count   = result.updated.length;
-        const backups = result.backed_up.length;
-
-        let msg = `✅ Updated to ${latestTag}! ${count} file(s) replaced.`;
-        if (backups > 0) msg += ` ${backups} backed up as .bak`;
-        if (updateTools) msg += "\n\nCheck your Campaign Name in Homepage if it was reset.";
-
-        new Notice(msg, 10000);
-        setTimeout(() => app.commands.executeCommandById("app:reload"), 2500);
-
+        result = await runPython(vaultPath, [
+            vaultPath,
+            check.new_version,
+            String(updateTools),
+            "--confirm",
+            check.manifest_url,
+        ]);
     } catch (e) {
         new Notice(`❌ Update failed: ${e.message}`, 12000);
-        console.error("UpdateVault error:", e);
+        console.error("UpdateVault confirm error:", e);
+        return;
+    }
+
+    // ── Show result ───────────────────────────────────────────────────────────
+    if (result.status === "success" || result.status === "partial") {
+        const count     = (result.updated                  || []).length;
+        const fails     = (result.failed                   || []).length;
+        const blocked   = (result.blocked                  || []).length;
+        const preserved = (result.user_templates_preserved || []).length;
+        const custFiles = (result.customized_files_updated || []).length;
+
+        let msg = `✅ Updated to ${check.latest_tag}!\n${count} file(s) replaced.`;
+
+        if (custFiles > 0)  msg += `\n\n${result.customized_files_note || `${custFiles} customized file(s) backed up.`}`;
+        if (preserved > 0)  msg += `\n\n${result.user_templates_note   || `${preserved} custom template(s) moved to z_Templates/_my_templates/.`}`;
+        if (blocked   > 0)  msg += `\n\n⊘ ${blocked} file(s) skipped (protected directories).`;
+        if (fails     > 0)  msg += `\n\n⚠️ ${fails} file(s) failed — see developer console.`;
+
+        if (result.old_backups_cleaned && result.old_backups_cleaned.length > 0) {
+            msg += `\n\nCleaned ${result.old_backups_cleaned.length} old backup folder(s).`;
+        }
+
+        if (updateTools) msg += "\n\nCheck your Campaign Name in Homepage if it was reset.";
+
+        new Notice(msg, 15000);
+
+        // Reload Obsidian after a short delay so the user can read the notice
+        setTimeout(() => app.commands.executeCommandById("app:reload"), 3500);
+
+    } else {
+        new Notice(`❌ Update failed: ${result.error || "Unknown error"}`, 12000);
+        console.error("UpdateVault result:", result);
     }
 };
