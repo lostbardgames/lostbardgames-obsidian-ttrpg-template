@@ -79,8 +79,9 @@ OPTIONAL_FEATURE_TYPE_MAP = {
     "TD": "Totem Feature", "TP": "Tunnel Perception",
 }
 
-CONTENT_TYPES = ["spells", "items", "backgrounds", "classes", "races",
-                 "languages", "deities", "feats", "conditions", "optionalfeatures"]
+CONTENT_TYPES = ["spells", "items", "backgrounds", "classes", "classfeatures", "races",
+                 "racialtraits", "backgroundfeatures", "languages", "deities", "feats",
+                 "conditions", "optionalfeatures"]
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
 
@@ -727,7 +728,7 @@ def import_items(source_filter: set) -> int:
         data = fetch_json(f"{BASE_URL}/{filename}")
         if not data:
             continue
-        key = "item" if "item" in data else "variant" if "variant" in data else None
+        key = "item" if "item" in data else "baseitem" if "baseitem" in data else "variant" if "variant" in data else None
         if not key:
             continue
         for item in data.get(key, []):
@@ -785,7 +786,12 @@ def _write_item(item: dict, out_dir: Path) -> int:
     if weapon_type: weapon_type = weapon_type.title()
 
     props = item.get("property", [])
-    weapon_props = [WEAPON_PROP_MAP.get(p, p) for p in props]
+    def _norm_prop(p):
+        # XPHB items use {"uid": "2H|XPHB", "note": "..."} dicts; others use plain strings
+        code = p.get("uid", "") if isinstance(p, dict) else p
+        code = code.split("|")[0]  # strip source suffix e.g. "AF|DMG" → "AF"
+        return WEAPON_PROP_MAP.get(code, code)
+    weapon_props = [_norm_prop(p) for p in props]
 
     armor_type = ""
     if item.get("armor"):
@@ -1430,6 +1436,271 @@ def _render_subclass_features(subclass_features: list) -> str:
             if isinstance(feat_ref, str):
                 parts.append(f"**{feat_ref.split('|')[0]}**")
     return "\n\n".join(parts) if parts else ""
+
+
+# ── Class feature importer ─────────────────────────────────────────────────────
+
+def import_class_features(source_filter: set) -> int:
+    out_dir = VAULT / "Campaign/Lore/Classes/Features"
+    # Clear existing notes so multi-class notes replace single-class ones
+    if out_dir.exists():
+        for f in out_dir.iterdir():
+            if f.suffix == ".md":
+                f.unlink()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    index = fetch_json(f"{BASE_URL}/class/index.json")
+    if not index:
+        print("  Could not fetch class index", file=sys.stderr)
+        return 0
+
+    # Pass 1: collect all sources per feature name
+    feature_map: dict = {}
+    for filename in index.values():
+        data = fetch_json(f"{BASE_URL}/class/{filename}")
+        if not data:
+            continue
+        for cf in (data.get("classFeature") or []):
+            if is_wotc(cf.get("source", ""), source_filter):
+                _collect_feature(cf, feature_map, subclass_short="")
+        for scf in (data.get("subclassFeature") or []):
+            if is_wotc(scf.get("source", ""), source_filter):
+                short = scf.get("subclassShortName", "")
+                _collect_feature(scf, feature_map, subclass_short=short)
+
+    # Pass 2: write one note per feature with all classes listed
+    count = 0
+    for feat_name, sources in feature_map.items():
+        class_names = list(dict.fromkeys(s["class_name"] for s in sources))
+        class_yaml  = "\n".join(f"  - '{c}'" for c in class_names)
+        class_links = " | ".join(f"[[{c}]]" for c in class_names)
+        min_level   = min(s["level"] for s in sources)
+        src0        = sources[0]
+
+        if len(sources) == 1:
+            s = src0
+            sub_line = f"\n**Subclass:** {s['subclass_short']}" if s["subclass_short"] else ""
+            body = render_entries(s["entries"]) if s["entries"] else ""
+            class_header = f"**Class:** {class_links} | **Level:** {s['level']}{sub_line}"
+        else:
+            sections = []
+            for s in sources:
+                sub = f" ({s['subclass_short']})" if s["subclass_short"] else ""
+                hdr = f"### {s['class_name']}{sub} *(Level {s['level']})*"
+                desc = render_entries(s["entries"]) if s["entries"] else ""
+                sections.append(f"{hdr}\n\n{desc}")
+            body = "\n\n".join(sections)
+            class_header = f"**Classes:** {class_links}"
+
+        content = f"""---
+tags:
+  - ClassFeature
+className:
+{class_yaml}
+featureLevel: {min_level}
+source: '{src0["source"]}'
+sourcePage: {src0["page"]}
+---
+
+# {feat_name}
+
+{class_header}
+
+{body}
+
+## Notes
+
+"""
+        fname = sanitize_filename(feat_name) + ".md"
+        if write_note(out_dir / fname, content):
+            count += 1
+        # Alias for die-suffixed names so [[Song of Rest]] resolves
+        base = re.sub(r'\s*\([dD]\d+\)$', '', feat_name).strip()
+        if base != feat_name:
+            write_note(out_dir / (sanitize_filename(base) + ".md"), content)
+
+    return count
+
+
+def _collect_feature(feature: dict, feature_map: dict, subclass_short: str) -> None:
+    name = feature.get("name", "Unknown")
+    feature_map.setdefault(name, []).append({
+        "class_name":    feature.get("className", ""),
+        "level":         feature.get("level", 0),
+        "subclass_short": subclass_short,
+        "source":        feature.get("source", ""),
+        "page":          feature.get("page", ""),
+        "entries":       feature.get("entries", []),
+    })
+
+
+# ── Racial trait importer ───────────────────────────────────────────────────────
+
+def import_racial_traits(source_filter: set) -> int:
+    out_dir = VAULT / "Campaign/Lore/Races/Traits"
+    # Clear existing notes so multi-race notes replace single-race ones
+    if out_dir.exists():
+        for f in out_dir.iterdir():
+            if f.suffix == ".md":
+                f.unlink()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    data = fetch_json(f"{BASE_URL}/races.json")
+    if not data:
+        return 0
+
+    # Pass 1: collect all (race_display_name, desc) per trait name
+    trait_map: dict = {}
+
+    for race in (data.get("race") or []):
+        if not is_wotc(race.get("source", ""), source_filter):
+            continue
+        race_name = race.get("name", "")
+        for entry in (race.get("entries") or []):
+            if not isinstance(entry, dict):
+                continue
+            name = entry.get("name", "").strip()
+            if not name:
+                continue
+            desc = render_entries(entry.get("entries") or [])
+            trait_map.setdefault(name, []).append((race_name, desc))
+
+    for sub in (data.get("subrace") or []):
+        src = sub.get("source", "")
+        if not is_wotc(src, source_filter):
+            continue
+        race_name   = sub.get("raceName") or sub.get("name", "")
+        sub_label   = sub.get("name", "")
+        display     = f"{sub_label} ({race_name})" if sub_label else race_name
+        for entry in (sub.get("entries") or []):
+            if not isinstance(entry, dict):
+                continue
+            name = entry.get("name", "").strip()
+            if not name:
+                continue
+            desc = render_entries(entry.get("entries") or [])
+            trait_map.setdefault(name, []).append((display, desc))
+
+    # Pass 2: write one note per trait with all races listed
+    count = 0
+
+    # Generic stub for Ability Score Increase — in every race but not a named entry
+    stub = """---
+tags:
+  - RacialTrait
+---
+
+# Ability Score Increase
+
+Each race provides an ability score increase as described in its racial traits. See your race entry for the specific increases granted.
+
+## Notes
+
+"""
+    if write_note(out_dir / "Ability Score Increase.md", stub):
+        count += 1
+
+    for trait_name, sources in trait_map.items():
+        race_names = list(dict.fromkeys(r for r, _ in sources))
+        race_yaml  = "\n".join(f"  - '{r}'" for r in race_names)
+        race_links = " | ".join(f"[[{r}]]" for r in race_names)
+
+        if len(sources) == 1:
+            body = sources[0][1]
+        else:
+            sections = [f"### {r}\n\n{d}" for r, d in sources]
+            body = "\n\n".join(sections)
+
+        content = f"""---
+tags:
+  - RacialTrait
+race:
+{race_yaml}
+---
+
+# {trait_name}
+
+**Race:** {race_links}
+
+{body}
+
+## Notes
+
+"""
+        fname = sanitize_filename(trait_name) + ".md"
+        if write_note(out_dir / fname, content):
+            count += 1
+
+    return count
+
+
+# ── Background feature importer ─────────────────────────────────────────────────
+
+def import_background_features(source_filter: set) -> int:
+    out_dir = VAULT / "Campaign/Lore/Backgrounds/Features"
+    # Clear existing notes so multi-background notes replace single-background ones
+    if out_dir.exists():
+        for f in out_dir.iterdir():
+            if f.suffix == ".md":
+                f.unlink()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    data = fetch_json(f"{BASE_URL}/backgrounds.json")
+    if not data:
+        return 0
+
+    # Pass 1: collect all (bg_name, desc) per feature name
+    feat_map: dict = {}
+    for bg in (data.get("background") or []):
+        if not is_wotc(bg.get("source", ""), source_filter):
+            continue
+        bg_name = bg.get("name", "")
+        for entry in (bg.get("entries") or []):
+            if not isinstance(entry, dict):
+                continue
+            raw_name = entry.get("name", "")
+            if not raw_name.startswith("Feature"):
+                continue
+            feat_name = raw_name.replace("Feature:", "").strip()
+            if not feat_name:
+                continue
+            desc = render_entries(entry.get("entries") or [])
+            feat_map.setdefault(feat_name, []).append((bg_name, desc))
+
+    # Pass 2: write one note per feature with all backgrounds listed
+    count = 0
+    for feat_name, sources in feat_map.items():
+        bg_names = list(dict.fromkeys(b for b, _ in sources))
+        bg_yaml  = "\n".join(f"  - '{b}'" for b in bg_names)
+        bg_links = " | ".join(f"[[{b}]]" for b in bg_names)
+
+        if len(sources) == 1:
+            body = sources[0][1]
+        else:
+            sections = [f"### {b}\n\n{d}" for b, d in sources]
+            body = "\n\n".join(sections)
+
+        content = f"""---
+tags:
+  - BackgroundFeature
+background:
+{bg_yaml}
+---
+
+# {feat_name}
+
+**Background:** {bg_links}
+
+{body}
+
+## Notes
+
+"""
+        fname = sanitize_filename(feat_name) + ".md"
+        if write_note(out_dir / fname, content):
+            count += 1
+
+    return count
 
 
 # ── Race importer ──────────────────────────────────────────────────────────────
@@ -2171,7 +2442,10 @@ def main():
     run("items", import_items)
     run("backgrounds", import_backgrounds)
     run("classes", import_classes)
+    run("classfeatures", import_class_features)
     run("races", import_races)
+    run("racialtraits", import_racial_traits)
+    run("backgroundfeatures", import_background_features)
     run("languages", import_languages)
     run("deities", import_deities)
     run("feats", import_feats)
