@@ -3,7 +3,8 @@
 **/.DS_Store
 
 # ── Obsidian session state (user-specific, auto-regenerated) ──────────────────
-.obsidian/workspace.json
+# workspace.json is intentionally tracked — it sets the default split layout
+# (Homepage left, Buttons right) for new users opening the vault for the first time.
 .obsidian/workspace-mobile.json
 .obsidian/ddb-config.json
 
