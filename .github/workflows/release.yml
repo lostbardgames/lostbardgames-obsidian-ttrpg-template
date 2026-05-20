@@ -187,10 +187,12 @@ jobs:
           echo "ZIP_NAME=${ZIP_NAME}" >> "$GITHUB_ENV"
 
       # ── Create GitHub Release and upload assets ───────────────────────────────
+      # Delete any existing release for this tag first (handles re-pushed tags).
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          gh release delete "${GITHUB_REF_NAME}" --yes 2>/dev/null || true
           gh release create "${GITHUB_REF_NAME}" \
             --title "TTRPG Vault ${GITHUB_REF_NAME}" \
             --notes "See release notes." \
