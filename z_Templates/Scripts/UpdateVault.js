@@ -33,6 +33,102 @@ function checkPython3(cmd) {
     });
 }
 
+function commandExists(cmd) {
+    return new Promise((resolve) => {
+        const { exec } = require("child_process");
+        const check = process.platform === "win32" ? `where ${cmd}` : `which ${cmd}`;
+        exec(check, { timeout: 5000 }, (err) => resolve(!err));
+    });
+}
+
+function runCommand(command, timeout = 120000) {
+    return new Promise((resolve, reject) => {
+        const { exec } = require("child_process");
+        exec(command, { timeout }, (err, stdout, stderr) => {
+            if (err) reject(new Error(stderr?.trim() || err.message));
+            else resolve({ stdout, stderr });
+        });
+    });
+}
+
+async function handleMissingPython(qa) {
+    const platform = process.platform;
+    const options  = [];
+
+    if (platform === "darwin") {
+        const hasBrew = await commandExists("brew");
+        if (hasBrew) {
+            options.push({ label: "Install via Homebrew (recommended)", action: async () => {
+                const notice = new Notice("⏳ Installing Python 3 via Homebrew… this may take a few minutes.", 0);
+                try {
+                    await runCommand("brew install python3", 300000);
+                    notice.hide();
+                    new Notice("✅ Python 3 installed. Retrying update check…", 5000);
+                    return await detectPython();
+                } catch (e) {
+                    notice.hide();
+                    new Notice(`❌ Homebrew install failed:\n${e.message}\n\nTry installing manually from python.org.`, 10000);
+                    return null;
+                }
+            }});
+        } else {
+            options.push({ label: "Install Homebrew + Python", action: async (qa) => {
+                const confirm = await qa.yesNoPrompt(
+                    "Install Homebrew?",
+                    "This will open a Terminal window to install Homebrew and Python 3. Your system password may be required. Continue?"
+                );
+                if (!confirm) return null;
+                const { exec } = require("child_process");
+                exec(`osascript -e 'tell application "Terminal" to do script "/bin/bash -c \\"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\\" && brew install python3"'`);
+                new Notice("⏳ Homebrew installer opened in Terminal.\n\nFollow the prompts there, then click Check for Updates again.", 12000);
+                return null;
+            }});
+        }
+        options.push({ label: "Open python.org download page", action: () => {
+            require("electron").shell.openExternal("https://www.python.org/downloads/");
+            new Notice("🌐 Opening python.org.\n\nAfter installing Python 3, restart Obsidian and click Check for Updates again.", 10000);
+            return null;
+        }});
+    } else if (platform === "win32") {
+        const hasWinget = await commandExists("winget");
+        if (hasWinget) {
+            options.push({ label: "Install via winget (recommended)", action: async () => {
+                const notice = new Notice("⏳ Installing Python 3 via winget… this may take a few minutes.", 0);
+                try {
+                    await runCommand("winget install --id Python.Python.3 --source winget --silent", 300000);
+                    notice.hide();
+                    new Notice("✅ Python 3 installed. You may need to restart Obsidian for the PATH to update.", 8000);
+                    return await detectPython();
+                } catch (e) {
+                    notice.hide();
+                    new Notice(`❌ winget install failed:\n${e.message}\n\nTry installing manually from python.org.`, 10000);
+                    return null;
+                }
+            }});
+        }
+        options.push({ label: "Open python.org download page", action: () => {
+            require("electron").shell.openExternal("https://www.python.org/downloads/");
+            new Notice("🌐 Opening python.org.\n\nInstall Python 3 and check \"Add Python to PATH\", then restart Obsidian and click Check for Updates again.", 12000);
+            return null;
+        }});
+    } else {
+        options.push({ label: "Open python.org download page", action: () => {
+            require("electron").shell.openExternal("https://www.python.org/downloads/");
+            new Notice("🌐 Opening python.org.\n\nAfter installing Python 3, restart Obsidian and click Check for Updates again.", 10000);
+            return null;
+        }});
+    }
+
+    options.push({ label: "Cancel", action: null });
+
+    const labels = options.map(o => o.label);
+    const choice = await qa.suggester(labels, labels);
+    if (!choice || choice === "Cancel") return null;
+
+    const selected = options.find(o => o.label === choice);
+    return selected?.action ? await selected.action(qa) : null;
+}
+
 /**
  * Run UpdateVault.py and return the parsed JSON result.
  * Progress lines emitted to stderr are silently consumed.
@@ -64,13 +160,10 @@ module.exports = async (params) => {
     const vaultPath = app.vault.adapter.basePath;
 
     // ── Detect Python once ────────────────────────────────────────────────────
-    const python = await detectPython();
+    let python = await detectPython();
     if (!python) {
-        new Notice(
-            "❌ Python 3 not found.\n\nInstall Python 3 from python.org (check \"Add Python to PATH\"), then restart Obsidian and try again.",
-            15000
-        );
-        return;
+        python = await handleMissingPython(qa);
+        if (!python) return;
     }
 
     // ── Step A: Check for updates ─────────────────────────────────────────────
