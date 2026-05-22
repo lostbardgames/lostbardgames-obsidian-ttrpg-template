@@ -1,5 +1,6 @@
 const CONTENT_TYPES = [
-  "spells", "items", "backgrounds", "classes", "races",
+  "spells", "items", "backgrounds", "classes", "classfeatures",
+  "races", "racialtraits", "backgroundfeatures",
   "languages", "deities", "feats", "conditions", "optionalfeatures",
 ];
 
@@ -136,11 +137,12 @@ module.exports = async (params) => {
     const totalMatch = stdout.match(/Wrote (\d+) notes total/);
     const total = totalMatch ? totalMatch[1] : "?";
     new Notice(
-      `✅ Import complete — ${total} notes written.\n\nReload the vault (Ctrl/Cmd+R) for Dataview to pick up new notes.`,
-      10000
+      `✅ Import complete — ${total} notes written. Reloading vault…`,
+      5000
     );
     console.log("[RunImport] output:\n", stdout);
     if (stderr?.trim()) console.warn("[RunImport] stderr:\n", stderr);
+    setTimeout(() => app.commands.executeCommandById("app:reload"), 2000);
   });
 };
 

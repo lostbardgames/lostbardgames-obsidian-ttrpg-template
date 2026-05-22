@@ -308,7 +308,7 @@
 > > Walks you through four steps:
 > > 1. **Source** — WotC official (all books), specific books (pick exactly which ones), or all sources including third-party
 > > 2. **Books** *(specific mode only)* — multi-select from PHB, XGE, TCE, DMG, CoS, and 30+ more
-> > 3. **Content types** — pick any combination of spells, items, classes, races, feats, backgrounds, languages, deities, conditions, and optional features
+> > 3. **Content types** — pick any combination of spells, items, classes, class features, races, racial traits, backgrounds, background features, feats, languages, deities, conditions, and optional features
 > > 4. **Confirm** — then downloads and creates notes automatically
 > >
 > > Non-destructive — existing notes are never overwritten, so it's safe to re-run. If Python 3 is not installed, the button will offer to install it for you. Requires an internet connection.
