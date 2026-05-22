@@ -162,7 +162,7 @@ jobs:
               "*.DS_Store",
               "*.pyc",
               "*.bak",
-              "z_Uncategoried/*",
+              "z_Uncategoried/[!.]*",  # skip user content but keep .gitkeep
           ]
 
           os.chdir(WORKSPACE)

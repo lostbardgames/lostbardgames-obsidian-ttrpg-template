@@ -10,7 +10,9 @@
 # ── User data & vault backups ─────────────────────────────────────────────────
 .trash/
 .vault-backups/
-z_Uncategoried/
+# Ignore user content inside z_Uncategoried but keep the folder itself
+z_Uncategoried/*
+!z_Uncategoried/.gitkeep
 
 # ── Python cache ──────────────────────────────────────────────────────────────
 __pycache__/
