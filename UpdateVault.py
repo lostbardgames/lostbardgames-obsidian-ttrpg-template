@@ -18,6 +18,12 @@ All progress messages go to stderr; exactly one JSON object goes to stdout.
 import sys
 import os
 import json
+
+# Force UTF-8 output on Windows (default console encoding is often cp1252)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 import hashlib
 import shutil
 import urllib.request
@@ -385,7 +391,7 @@ def cmd_check(vault_path):
     # Read current installed version
     current_version = "0.0.0"
     try:
-        with open(os.path.join(vault_path, "version.json")) as f:
+        with open(os.path.join(vault_path, "version.json"), encoding="utf-8") as f:
             current_version = json.load(f).get("version", "0.0.0")
     except Exception:
         pass
@@ -491,7 +497,7 @@ def cmd_confirm(vault_path, new_version, update_tools, manifest_url):
     # Read current version for backup folder name
     current_version = "0.0.0"
     try:
-        with open(os.path.join(vault_path, "version.json")) as f:
+        with open(os.path.join(vault_path, "version.json"), encoding="utf-8") as f:
             current_version = json.load(f).get("version", "0.0.0")
     except Exception:
         pass
@@ -580,7 +586,7 @@ def cmd_confirm(vault_path, new_version, update_tools, manifest_url):
 
     # ── Stamp new version ──────────────────────────────────────────────────────
     try:
-        with open(os.path.join(vault_path, "version.json"), "w") as fh:
+        with open(os.path.join(vault_path, "version.json"), "w", encoding="utf-8") as fh:
             json.dump({"version": new_version}, fh, indent=2)
         updated.append("version.json")
     except Exception as e:

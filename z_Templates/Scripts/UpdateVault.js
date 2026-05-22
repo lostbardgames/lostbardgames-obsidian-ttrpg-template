@@ -5,32 +5,32 @@ const PYTHON_SCRIPT = "UpdateVault.py"; // relative to vault root
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
- * Detect the correct Python executable name for the current OS.
- * Windows uses "python"; macOS/Linux use "python3".
- * Falls back to "python3" if detection fails.
+ * Detect the correct Python 3 executable for the current OS.
+ * Windows uses "python" (or "py"); macOS/Linux use "python3".
+ * Returns null if no Python 3 is found.
  */
 async function detectPython() {
-    const { exec }      = require("child_process");
-    const { promisify } = require("util");
-    const execAsync     = promisify(exec);
-
-    // On Windows, "python3" triggers the Microsoft Store stub and fails.
-    // "python" is the correct command when Python is properly installed.
+    // On Windows "python3" triggers the Microsoft Store stub — try "python" first.
     const candidates = process.platform === "win32"
-        ? ["python", "python3"]
+        ? ["python", "py", "python3"]
         : ["python3", "python"];
 
     for (const cmd of candidates) {
-        try {
-            const { stdout } = await execAsync(`${cmd} --version`);
-            if (stdout.includes("Python 3") || stdout.includes("Python 2")) {
-                return cmd;
-            }
-        } catch (_) {
-            // try next candidate
-        }
+        const found = await checkPython3(cmd);
+        if (found) return cmd;
     }
-    return candidates[0]; // best guess
+    return null;
+}
+
+function checkPython3(cmd) {
+    return new Promise((resolve) => {
+        const { exec } = require("child_process");
+        exec(`"${cmd}" --version`, { timeout: 8000 }, (err, stdout, stderr) => {
+            // Python 3 prints "Python 3.x.y" to stdout (or stderr on older builds)
+            const output = (stdout + stderr).trim();
+            resolve(!err && /Python 3\./.test(output) ? cmd : null);
+        });
+    });
 }
 
 /**
@@ -38,17 +38,17 @@ async function detectPython() {
  * Progress lines emitted to stderr are silently consumed.
  * Throws if the process errors or produces no JSON.
  */
-async function runPython(vaultPath, args) {
+async function runPython(vaultPath, args, python) {
     const { exec }      = require("child_process");
     const { promisify } = require("util");
+    const path          = require("path");
     const execAsync     = promisify(exec);
 
-    const python = await detectPython();
-
+    const scriptPath = path.join(vaultPath, PYTHON_SCRIPT);
     const quotedArgs = args
         .map(a => `"${String(a).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`)
         .join(" ");
-    const cmd = `${python} "${vaultPath}/${PYTHON_SCRIPT}" ${quotedArgs}`;
+    const cmd = `"${python}" "${scriptPath}" ${quotedArgs}`;
 
     const { stdout } = await execAsync(cmd, { maxBuffer: 10 * 1024 * 1024 });
 
@@ -63,13 +63,23 @@ module.exports = async (params) => {
     const { app, quickAddApi: qa } = params;
     const vaultPath = app.vault.adapter.basePath;
 
+    // ── Detect Python once ────────────────────────────────────────────────────
+    const python = await detectPython();
+    if (!python) {
+        new Notice(
+            "❌ Python 3 not found.\n\nInstall Python 3 from python.org (check \"Add Python to PATH\"), then restart Obsidian and try again.",
+            15000
+        );
+        return;
+    }
+
     // ── Step A: Check for updates ─────────────────────────────────────────────
     new Notice("Checking for updates…");
 
     let check;
     try {
         // Single arg: vault_path. Python reads version.json and fetches GitHub.
-        check = await runPython(vaultPath, [vaultPath]);
+        check = await runPython(vaultPath, [vaultPath], python);
     } catch (e) {
         new Notice(`❌ Update check failed: ${e.message}`, 10000);
         console.error("UpdateVault check error:", e);
@@ -147,7 +157,7 @@ module.exports = async (params) => {
             String(updateTools),
             "--confirm",
             check.manifest_url,
-        ]);
+        ], python);
     } catch (e) {
         new Notice(`❌ Update failed: ${e.message}`, 12000);
         console.error("UpdateVault confirm error:", e);

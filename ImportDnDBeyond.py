@@ -9,6 +9,12 @@ import sys, os, json, re, urllib.request, urllib.error
 from collections import defaultdict
 from datetime import datetime
 
+# Force UTF-8 output on Windows (default console encoding is often cp1252)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 # ── Constants ──────────────────────────────────────────────────────────────────
 
 API_URL = "https://character-service.dndbeyond.com/character/v5/character/{id}"

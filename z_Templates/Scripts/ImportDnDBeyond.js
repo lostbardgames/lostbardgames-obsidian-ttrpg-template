@@ -1,5 +1,22 @@
 // ── Helpers ────────────────────────────────────────────────────────────────
 
+// Detect Python 3 on Windows ("python"/"py") and macOS/Linux ("python3")
+function detectPython3() {
+    const candidates = process.platform === "win32"
+        ? ["python", "py", "python3"]
+        : ["python3", "python"];
+    return candidates.reduce(
+        (chain, cmd) => chain.then(found => found || new Promise(resolve => {
+            const { exec } = require("child_process");
+            exec(`"${cmd}" --version`, { timeout: 8000 }, (err, stdout, stderr) => {
+                const out = (stdout + stderr).trim();
+                resolve(!err && /Python 3\./.test(out) ? cmd : null);
+            });
+        })),
+        Promise.resolve(null)
+    );
+}
+
 function extractCharId(input) {
     const trimmed = input.trim();
     const match = trimmed.match(/\/characters?\/(\d+)/i);
@@ -162,22 +179,26 @@ module.exports = async (params) => {
     // ── Run Python importer ───────────────────────────────────────────────
     const { exec }      = require("child_process");
     const { promisify } = require("util");
+    const path          = require("path");
     const execAsync     = promisify(exec);
 
-    // Detect python3 vs python (Windows uses "python", not "python3")
-    const pythonCandidates = process.platform === "win32"
-        ? ["python", "python3"]
-        : ["python3", "python"];
-    let pythonCmd = pythonCandidates[0];
-    for (const candidate of pythonCandidates) {
-        try {
-            await execAsync(`${candidate} --version`);
-            pythonCmd = candidate;
-            break;
-        } catch (_) {}
+    // Detect Python 3 — Windows uses "python" not "python3"
+    const pythonCmd = await detectPython3();
+    if (!pythonCmd) {
+        new Notice(
+            "❌ Python 3 not found.\n\nInstall Python 3 from python.org (check \"Add Python to PATH\"), then restart Obsidian and try again.",
+            15000
+        );
+        return;
     }
 
-    const cmd = `${pythonCmd} "${vaultPath}/ImportDnDBeyond.py" "${vaultPath}" "${charId}" "${partyName}"`;
+    // Use path.join for cross-platform path construction;
+    // escape each argument so special chars and backslashes are safe in the shell
+    function shellQuote(s) {
+        return `"${String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+    }
+    const scriptPath = path.join(vaultPath, "ImportDnDBeyond.py");
+    const cmd = `${shellQuote(pythonCmd)} ${shellQuote(scriptPath)} ${shellQuote(vaultPath)} ${shellQuote(charId)} ${shellQuote(partyName)}`;
 
     new Notice("⏳ Fetching character from D&D Beyond…");
 

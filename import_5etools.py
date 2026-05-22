@@ -20,9 +20,15 @@ import urllib.error
 from pathlib import Path
 from typing import Any, Optional
 
+# Force UTF-8 output on Windows (default console encoding is often cp1252)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 # ── Configuration ─────────────────────────────────────────────────────────────
 
-VAULT = Path("/Users/stetsonseib/Library/Mobile Documents/iCloud~md~obsidian/Documents/TTRPG")
+VAULT = Path(".")  # overridden by --vault argument at runtime
 BASE_URL = "https://raw.githubusercontent.com/5etools-mirror-3/5etools-src/main/data"
 
 WOTC_SOURCES = {
