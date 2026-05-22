@@ -5,6 +5,35 @@ const PYTHON_SCRIPT = "UpdateVault.py"; // relative to vault root
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
+ * Detect the correct Python executable name for the current OS.
+ * Windows uses "python"; macOS/Linux use "python3".
+ * Falls back to "python3" if detection fails.
+ */
+async function detectPython() {
+    const { exec }      = require("child_process");
+    const { promisify } = require("util");
+    const execAsync     = promisify(exec);
+
+    // On Windows, "python3" triggers the Microsoft Store stub and fails.
+    // "python" is the correct command when Python is properly installed.
+    const candidates = process.platform === "win32"
+        ? ["python", "python3"]
+        : ["python3", "python"];
+
+    for (const cmd of candidates) {
+        try {
+            const { stdout } = await execAsync(`${cmd} --version`);
+            if (stdout.includes("Python 3") || stdout.includes("Python 2")) {
+                return cmd;
+            }
+        } catch (_) {
+            // try next candidate
+        }
+    }
+    return candidates[0]; // best guess
+}
+
+/**
  * Run UpdateVault.py and return the parsed JSON result.
  * Progress lines emitted to stderr are silently consumed.
  * Throws if the process errors or produces no JSON.
@@ -14,10 +43,12 @@ async function runPython(vaultPath, args) {
     const { promisify } = require("util");
     const execAsync     = promisify(exec);
 
+    const python = await detectPython();
+
     const quotedArgs = args
         .map(a => `"${String(a).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`)
         .join(" ");
-    const cmd = `python3 "${vaultPath}/${PYTHON_SCRIPT}" ${quotedArgs}`;
+    const cmd = `${python} "${vaultPath}/${PYTHON_SCRIPT}" ${quotedArgs}`;
 
     const { stdout } = await execAsync(cmd, { maxBuffer: 10 * 1024 * 1024 });
 

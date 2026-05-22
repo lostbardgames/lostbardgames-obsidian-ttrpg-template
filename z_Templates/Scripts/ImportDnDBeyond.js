@@ -164,7 +164,20 @@ module.exports = async (params) => {
     const { promisify } = require("util");
     const execAsync     = promisify(exec);
 
-    const cmd = `python3 "${vaultPath}/ImportDnDBeyond.py" "${vaultPath}" "${charId}" "${partyName}"`;
+    // Detect python3 vs python (Windows uses "python", not "python3")
+    const pythonCandidates = process.platform === "win32"
+        ? ["python", "python3"]
+        : ["python3", "python"];
+    let pythonCmd = pythonCandidates[0];
+    for (const candidate of pythonCandidates) {
+        try {
+            await execAsync(`${candidate} --version`);
+            pythonCmd = candidate;
+            break;
+        } catch (_) {}
+    }
+
+    const cmd = `${pythonCmd} "${vaultPath}/ImportDnDBeyond.py" "${vaultPath}" "${charId}" "${partyName}"`;
 
     new Notice("⏳ Fetching character from D&D Beyond…");
 
