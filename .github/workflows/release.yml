@@ -162,6 +162,7 @@ jobs:
               "*.DS_Store",
               "*.pyc",
               "*.bak",
+              "README.md",             # GitHub-only, not part of the vault
               "z_Uncategoried/[!.]*",  # skip user content but keep .gitkeep
           ]
 
