@@ -111,13 +111,15 @@ module.exports = async (params) => {
   if (!confirm) return;
 
   // ── Build command ──────────────────────────────────────────────────────────
+  const path = require("path");
   const vaultPath  = app.vault.adapter.basePath;
-  const scriptPath = `${vaultPath}/import_5etools.py`;
+  const scriptPath = path.join(vaultPath, "import_5etools.py");
+  const shellQuote = a => `"${String(a).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 
   const typeArg = selectedTypes.length < CONTENT_TYPES.length
     ? `--type ${selectedTypes.join(" ")}`
     : "";
-  const command = `"${python}" "${scriptPath}" --vault "${vaultPath}" ${sourceArg} ${typeArg}`.trim();
+  const command = `${shellQuote(python)} ${shellQuote(scriptPath)} --vault ${shellQuote(vaultPath)} ${sourceArg} ${typeArg}`.trim();
 
   // ── Run ────────────────────────────────────────────────────────────────────
   const startNotice = new Notice(
