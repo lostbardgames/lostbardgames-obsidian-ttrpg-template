@@ -25,15 +25,9 @@ try {
 if (!systemAlreadyConfigured) {
     // ── System definitions (kept in sync with SetupSystem.js) ────────────
     const SYSTEMS = [
-        { id: "agnostic",    name: "System Agnostic",                      icon: "🎲", desc: "No system-specific rules — works with any TTRPG" },
-        { id: "dnd5e",       name: "D&D 5th Edition (2014)",               icon: "⚔️", desc: "2014 Player's Handbook — Race, Class, Background, Spells" },
-        { id: "dnd5e_2024",  name: "D&D 5th Edition (2024 / One D&D)",     icon: "⚔️", desc: "2024 revised rules — Species, Origin Feats, updated classes" },
-        { id: "pf2e",        name: "Pathfinder 2nd Edition",               icon: "🔆", desc: "Ancestry, Heritage, Proficiency ranks, 3-action system" },
-        { id: "pf1e",        name: "Pathfinder 1e / D&D 3.5",             icon: "🏹", desc: "BAB, three saves, skill ranks, archetypes" },
-        { id: "coc7e",       name: "Call of Cthulhu 7th Edition",          icon: "🐙", desc: "Investigators, Occupations, percentile skills, Sanity" },
-        { id: "vtm5",        name: "Vampire: The Masquerade 5e",           icon: "🩸", desc: "Clans, Disciplines, Hunger, Humanity, the Masquerade" },
-        { id: "starfinder",  name: "Starfinder 1st Edition",               icon: "🚀", desc: "Sci-fi adventure — Themes, Stamina/HP/Resolve, starships" },
-        { id: "swade",       name: "Savage Worlds Adventure Edition",      icon: "🎴", desc: "Die-based attributes, Edges & Hindrances, fast play" },
+        { id: "dnd5e",      name: "D&D 5th Edition (2014)",      icon: "⚔️", desc: "2014 Player's Handbook — Race, Class, Background, Spells" },
+        { id: "dnd5e_2024", name: "D&D 5.5e (2024 / One D&D)",  icon: "⚔️", desc: "2024 revised rules — Species, Origin Feats, updated classes" },
+        { id: "pf2e",       name: "Pathfinder 2nd Edition",      icon: "🔆", desc: "Ancestry, Heritage, Proficiency ranks, 3-action system" },
     ];
 
     const labels = SYSTEMS.map(s => `${s.icon}  ${s.name}  —  ${s.desc}`);
