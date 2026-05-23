@@ -32,8 +32,8 @@ closeDuplicateHomepages(); // handle any that already exist
 const layoutRef = app.workspace.on("layout-change", closeDuplicateHomepages);
 setTimeout(() => app.workspace.offref(layoutRef), 2000); // stop watching after 2 s
 
-// ── Ensure Buttons.md is pinned in the right sidebar ─────────────────────
-// Helper: walk up parent chain to test if a leaf lives in the right sidebar.
+// ── Ensure Buttons.md and Dice Tray are pinned in the right sidebar ──────
+// Helper: returns true if the leaf lives inside the right sidebar split.
 function isInRightSidebar(leaf) {
     let node = leaf.parent;
     while (node) {
@@ -47,18 +47,25 @@ const homeLeaves = app.workspace.getLeavesOfType("markdown")
     .filter(l => l.view?.file?.path === homepagePath);
 const activeLeaf = homeLeaves[0] ?? app.workspace.getMostRecentLeaf();
 
-// Close any copies of Buttons.md that are in the main area (not the sidebar).
+// Close any Buttons.md copies that ended up in the main editing area.
 app.workspace.getLeavesOfType("markdown")
     .filter(l => l.view?.file?.path === buttonPath && !isInRightSidebar(l))
     .forEach(l => l.detach());
 
-// If Buttons.md is not already in the right sidebar, open it there.
-const inRightSidebar = app.workspace.getLeavesOfType("markdown")
+// Open Buttons.md in the right sidebar if not already there.
+const buttonsInSidebar = app.workspace.getLeavesOfType("markdown")
     .some(l => l.view?.file?.path === buttonPath && isInRightSidebar(l));
-
-if (!inRightSidebar) {
+if (!buttonsInSidebar) {
     const leaf = app.workspace.getRightLeaf(false);
     await leaf.openFile(buttonFile, { state: { mode: "preview" } });
+}
+
+// Open Dice Tray in the right sidebar if not already there.
+const diceInSidebar = app.workspace.getLeavesOfType("DICE_ROLLER_VIEW")
+    .some(l => isInRightSidebar(l));
+if (!diceInSidebar) {
+    const leaf = app.workspace.getRightLeaf(false);
+    await leaf.setViewState({ type: "DICE_ROLLER_VIEW", active: false });
 }
 
 // Expand the right sidebar if collapsed.

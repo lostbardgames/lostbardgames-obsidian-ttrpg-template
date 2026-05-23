@@ -93,35 +93,13 @@
             }
           },
           {
-            "id": "a1b2c3d4e5f60012",
+            "id": "a1b2c3d4e5f60014",
             "type": "leaf",
             "state": {
-              "type": "backlink",
-              "state": {
-                "collapseAll": false,
-                "extraContext": false,
-                "sortOrder": "alphabetical",
-                "showSearch": false,
-                "searchQuery": "",
-                "backlinkCollapsed": false,
-                "unlinkedCollapsed": true
-              },
-              "icon": "links-coming-in",
-              "title": "Backlinks"
-            }
-          },
-          {
-            "id": "a1b2c3d4e5f60013",
-            "type": "leaf",
-            "state": {
-              "type": "outline",
-              "state": {
-                "followCursor": false,
-                "showSearch": false,
-                "searchQuery": ""
-              },
-              "icon": "lucide-list",
-              "title": "Outline"
+              "type": "DICE_ROLLER_VIEW",
+              "state": {},
+              "icon": "dice",
+              "title": "Dice Tray"
             }
           }
         ],
