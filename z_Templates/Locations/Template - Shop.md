@@ -3,7 +3,6 @@ tags:
   - Location
   - POI
   - Shop
-location:
 mapmarker:
 art: "[[PlaceholderPOI.png]]"
 aliases:

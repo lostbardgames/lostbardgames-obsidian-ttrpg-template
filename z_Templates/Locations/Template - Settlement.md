@@ -2,7 +2,6 @@
 tags:
   - Location
   - Settlement
-location:
 mapmarker: Settlement
 art: "[[PlaceholderSettlement.png]]"
 mapSketch:

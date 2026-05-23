@@ -7,9 +7,9 @@ cssclasses:
   - wide-page
 ---
 
-# 🏰 `VIEW[{campaignName}][text]`
+# 🏰 `VIEW[{campaignName}][link]`
 
-`INPUT[text(placeholder(Campaign Name)):campaignName]` Active Party: `INPUT[text(placeholder(Party Name)):activeParty]`
+Adventure: `INPUT[suggester(optionQuery("Campaign/Parties/Adventures")):campaignName]` Party: `INPUT[suggester(optionQuery("Campaign/Parties/Party Dashboards")):activeParty]`
 
 ---
 
@@ -78,7 +78,8 @@ cssclasses:
 > > [!info] 🛡️ Active Party
 > >
 > > ```dataviewjs
-> > const party = dv.current().activeParty;
+> > const partyRaw = dv.current().activeParty;
+> > const party = partyRaw?.path ? partyRaw.path.split("/").pop().replace(/\.md$/, "") : (partyRaw ?? null);
 > > if (!party) {
 > >   dv.paragraph("_Set `activeParty` above to load your party._");
 > > } else {
@@ -104,24 +105,36 @@ cssclasses:
 > >
 > > **📝 Recent Sessions**
 > >
-> > ```dataview
-> > TABLE WITHOUT ID
-> >   file.link as "Session",
-> >   sessionNumber as "#",
-> >   sessionDate as "Date"
-> > FROM "Campaign/Parties/Session Notes"
-> > WHERE econtains(tags, "SessionNote")
-> > SORT sessionDate DESC
-> > LIMIT 5
+> > ```dataviewjs
+> > const partyRaw = dv.current().activeParty;
+> > const party = partyRaw?.path ? partyRaw.path.split("/").pop().replace(/\.md$/, "") : (partyRaw ?? null);
+> > if (!party) {
+> >   dv.paragraph("_Select a party above to see recent sessions._");
+> > } else {
+> >   const sessions = dv.pages('"Campaign/Parties/Session Notes"')
+> >     .where(s => s.tags?.includes("SessionNote") && s.whichParty?.some?.(p => String(p).includes(party)));
+> >   dv.table(
+> >     ["Session", "#", "Date"],
+> >     sessions.sort(s => s.sessionDate, "desc").limit(5).map(s => [s.file.link, s.sessionNumber, s.sessionDate])
+> >   );
+> > }
 > > ```
 > >
 > > **⚡ Open Quests**
 > >
-> > ```dataview
-> > LIST FROM "Campaign/Parties/Quests"
-> > WHERE completed = false OR completed = null
-> > SORT file.mtime DESC
-> > LIMIT 6
+> > ```dataviewjs
+> > const partyRaw = dv.current().activeParty;
+> > const party = partyRaw?.path ? partyRaw.path.split("/").pop().replace(/\.md$/, "") : (partyRaw ?? null);
+> > if (!party) {
+> >   dv.paragraph("_Select a party above to see open quests._");
+> > } else {
+> >   const quests = dv.pages('"Campaign/Parties/Quests"')
+> >     .where(q => (q.completed === false || q.completed == null) && q.whichParty?.some?.(p => String(p).includes(party)));
+> >   dv.table(
+> >     ["Quest", "Type", "Giver"],
+> >     quests.sort(q => q.file.mtime, "desc").limit(6).map(q => [q.file.link, q.questType ?? "—", q.questGiver ?? "—"])
+> >   );
+> > }
 > > ```
 
 ---
@@ -163,7 +176,7 @@ cssclasses:
 > > if (settlements.length > 0) {
 > >   dv.header(4, "Settlements");
 > >   dv.list(settlements.sort(s => s.file.name).map(s => {
-> >     const loc = s.location ? ` *(${Array.isArray(s.location) ? s.location[0] : s.location})*` : "";
+> >     const loc = s.currentLocation?.length ? ` (${s.currentLocation[0]})` : "";
 > >     return `${s.file.link}${loc}`;
 > >   }));
 > > }

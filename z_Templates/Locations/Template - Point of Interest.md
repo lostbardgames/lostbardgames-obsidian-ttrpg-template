@@ -2,7 +2,6 @@
 tags:
   - Location
   - POI
-location:
 mapmarker:
 art: "[[PlaceholderPOI.png]]"
 mapSketch:

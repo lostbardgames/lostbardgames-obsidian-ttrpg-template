@@ -2,7 +2,6 @@
 tags:
   - Location
   - District
-location:
 mapmarker: District
 art: "[[PlaceholderDistrict.png]]"
 mapSketch:

@@ -19,22 +19,18 @@ const buttonFile   = app.vault.getAbstractFileByPath(buttonPath);
 if (!buttonFile) return;
 
 // ── Guard against the Homepage plugin opening a duplicate tab ─────────────
-// The plugin fires at an unpredictable time during startup — sometimes
-// before this template, sometimes after. Register a short-lived workspace
-// listener that closes any extra Homepage.md copies as soon as they appear,
-// covering both cases (already open now, or opened in the next 2 seconds).
 function closeDuplicateHomepages() {
     const leaves = app.workspace.getLeavesOfType("markdown")
         .filter(l => l.view?.file?.path === homepagePath);
     for (const leaf of leaves.slice(1)) leaf.detach();
 }
-closeDuplicateHomepages(); // handle any that already exist
+closeDuplicateHomepages();
 const layoutRef = app.workspace.on("layout-change", closeDuplicateHomepages);
-setTimeout(() => app.workspace.offref(layoutRef), 2000); // stop watching after 2 s
+setTimeout(() => app.workspace.offref(layoutRef), 2000);
 
-// ── Right-sidebar setup ───────────────────────────────────────────────────
-// Walk the right split tree to collect every leaf panel currently open.
-function getRightSidebarLeaves() {
+// ── Helpers ───────────────────────────────────────────────────────────────
+// Walk the right-split tree and return every leaf panel in it.
+function getRightLeaves() {
     const leaves = [];
     function walk(node) {
         if (!node) return;
@@ -45,42 +41,68 @@ function getRightSidebarLeaves() {
     return leaves;
 }
 
+// Returns true if a leaf lives inside the right sidebar.
+function isInRight(leaf) {
+    let n = leaf.parent;
+    while (n) { if (n === app.workspace.rightSplit) return true; n = n.parent; }
+    return false;
+}
+
 const homeLeaves = app.workspace.getLeavesOfType("markdown")
     .filter(l => l.view?.file?.path === homepagePath);
 const activeLeaf = homeLeaves[0] ?? app.workspace.getMostRecentLeaf();
 
-// Step 1: Remove every right-sidebar panel that isn't Buttons or Dice Tray.
-const snapshot = getRightSidebarLeaves();
-for (const leaf of snapshot) {
+// ── Step 1: Remove every right-sidebar panel that isn't Buttons or Dice ───
+for (const leaf of getRightLeaves()) {
     const isButtons = leaf.view?.file?.path === buttonPath;
     const isDice    = leaf.getViewState?.().type === "DICE_ROLLER_VIEW";
     if (!isButtons && !isDice) leaf.detach();
 }
 
-// Step 2: Close any Buttons.md copies that ended up in the main area.
+// ── Step 2: Close any Buttons.md copies in the main editing area ──────────
 for (const leaf of app.workspace.getLeavesOfType("markdown")) {
-    if (leaf.view?.file?.path !== buttonPath) continue;
-    let inRight = false;
-    let node = leaf.parent;
-    while (node) { if (node === app.workspace.rightSplit) { inRight = true; break; } node = node.parent; }
-    if (!inRight) leaf.detach();
+    if (leaf.view?.file?.path === buttonPath && !isInRight(leaf)) leaf.detach();
 }
 
-// Step 3: Add Buttons to the right sidebar if it's not already there.
-const hasButtons = getRightSidebarLeaves().some(l => l.view?.file?.path === buttonPath);
-if (!hasButtons) {
-    const leaf = app.workspace.getRightLeaf(false);
-    await leaf.openFile(buttonFile, { state: { mode: "preview" } });
+// ── Step 3: Ensure Buttons is in the right sidebar ────────────────────────
+let buttonsLeaf = getRightLeaves().find(l => l.view?.file?.path === buttonPath);
+if (!buttonsLeaf) {
+    buttonsLeaf = app.workspace.getRightLeaf(false);
+    await buttonsLeaf.openFile(buttonFile, { state: { mode: "preview" } });
 }
 
-// Step 4: Add Dice Tray to the right sidebar if it's not already there.
-const hasDice = getRightSidebarLeaves().some(l => l.getViewState?.().type === "DICE_ROLLER_VIEW");
-if (!hasDice) {
-    const leaf = app.workspace.getRightLeaf(false);
-    await leaf.setViewState({ type: "DICE_ROLLER_VIEW", active: false });
+// ── Step 4: Ensure Dice Tray is in the right sidebar ─────────────────────
+let diceLeaf = getRightLeaves().find(l => l.getViewState?.().type === "DICE_ROLLER_VIEW");
+if (!diceLeaf) {
+    // getRightLeaf(false) may return the existing Buttons leaf — guard against that.
+    const candidate = app.workspace.getRightLeaf(false);
+    if (candidate === buttonsLeaf) {
+        // Force a genuinely new tab by splitting then collapsing the split into tabs.
+        diceLeaf = app.workspace.createLeafBySplit(buttonsLeaf, "vertical", false);
+    } else {
+        diceLeaf = candidate;
+    }
+    await diceLeaf.setViewState({ type: "DICE_ROLLER_VIEW", active: false });
 }
 
-// Step 5: Expand the right sidebar and restore focus to Homepage.
+// ── Step 5: Enforce order — Buttons tab 0, Dice Tray tab 1 ───────────────
+// The WorkspaceTabs container is the first child of the right split.
+const rightTabs = app.workspace.rightSplit?.children?.[0];
+if (rightTabs?.children && buttonsLeaf && diceLeaf) {
+    const tabs = rightTabs.children;
+    const bIdx = tabs.indexOf(buttonsLeaf);
+    const dIdx = tabs.indexOf(diceLeaf);
+    if (bIdx !== -1 && dIdx !== -1 && bIdx !== 0) {
+        // Splice Buttons to the front.
+        tabs.splice(bIdx, 1);
+        tabs.unshift(buttonsLeaf);
+    }
+    // Activate Buttons as the selected tab.
+    rightTabs.currentTab = 0;
+    app.workspace.trigger("layout-change");
+}
+
+// ── Step 6: Expand right sidebar and restore focus to Homepage ────────────
 if (app.workspace.rightSplit.collapsed) {
     app.workspace.rightSplit.toggle();
 }

@@ -2,7 +2,6 @@
 tags:
   - Location
   - World
-location:
 mapmarker:
 art: "[[PlaceholderWorld.png]]"
 mapSketch:
