@@ -94,14 +94,23 @@ async function handleMissingPython(qa) {
         if (hasWinget) {
             options.push({ label: "Install via winget (recommended)", action: async () => {
                 const notice = new Notice("⏳ Installing Python 3 via winget… this may take a few minutes.", 0);
-                try {
-                    await runCommand("winget install --id Python.Python.3 --source winget --silent", 300000);
-                    notice.hide();
+                // winget requires the minor version in the package ID (e.g. Python.Python.3.13).
+                // Try versions newest-first so this stays current as Python releases new versions.
+                const versions = ["3.13", "3.12", "3.11", "3.10"];
+                let installed = false;
+                for (const v of versions) {
+                    try {
+                        await runCommand(`winget install --id Python.Python.${v} --source winget --silent`, 300000);
+                        installed = true;
+                        break;
+                    } catch (_) { /* try next version */ }
+                }
+                notice.hide();
+                if (installed) {
                     new Notice("✅ Python 3 installed. You may need to restart Obsidian for the PATH to update.", 8000);
                     return await detectPython();
-                } catch (e) {
-                    notice.hide();
-                    new Notice(`❌ winget install failed:\n${e.message}\n\nTry installing manually from python.org.`, 10000);
+                } else {
+                    new Notice("❌ winget install failed for all Python versions.\n\nTry installing manually from python.org.", 10000);
                     return null;
                 }
             }});
