@@ -22,3 +22,6 @@ __pycache__/
 *.bak
 TTRPG-Vault-*.zip
 files.json
+
+# ── Claude project memory (local only, never pushed to GitHub) ────────────────
+CLAUDE.md
