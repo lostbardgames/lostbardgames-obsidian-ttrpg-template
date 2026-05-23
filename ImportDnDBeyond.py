@@ -267,12 +267,14 @@ RACE_NAME_MAP = {
 
 # DDB background names → vault note names (DDB sometimes uses the variant short-name)
 BACKGROUND_NAME_MAP = {
-    "Knight":        "Variant Noble (Knight)",
-    "Spy":           "Variant Criminal (Spy)",
-    "Gladiator":     "Variant Entertainer (Gladiator)",
-    "Pirate":        "Variant Sailor (Pirate)",
-    "Guild Merchant": "Variant Guild Artisan (Guild Merchant)",
-    "Investigator":  "Variant City Watch (Investigator)",
+    "Knight":              "Variant Noble (Knight)",
+    "Spy":                 "Variant Criminal (Spy)",
+    "Criminal / Spy":      "Variant Criminal (Spy)",
+    "Gladiator":           "Variant Entertainer (Gladiator)",
+    "Pirate":              "Variant Sailor (Pirate)",
+    "Guild Merchant":      "Variant Guild Artisan (Guild Merchant)",
+    "Investigator":        "Variant City Watch (Investigator)",
+    "Sage (Cobalt Scholar)": "Cobalt Scholar (Sage)",
 }
 
 # DDB-generated class-feature entries that have no 5e.tools equivalents — skip linking these
@@ -325,6 +327,72 @@ def _item_link(raw_name: str, items_dir: str) -> str:
     if os.path.exists(note_path):
         return f"[[{resolved}]]"
     return resolved
+
+
+def _build_lore_index(vault_path: str) -> dict:
+    """Scan Lore folders and build a case-insensitive name → actual filename lookup.
+
+    Used by _lore_link to fuzzy-match DDB names against whatever notes exist in
+    the vault, so mismatched capitalisation or word order doesn't produce broken links.
+    """
+    lore_dirs = {
+        "classes":     os.path.join(vault_path, "Campaign", "Lore", "Classes"),
+        "subclasses":  os.path.join(vault_path, "Campaign", "Lore", "Classes", "Subclasses"),
+        "backgrounds": os.path.join(vault_path, "Campaign", "Lore", "Backgrounds"),
+        "races":       os.path.join(vault_path, "Campaign", "Lore", "Races"),
+        "species":     os.path.join(vault_path, "Campaign", "Lore", "Species"),
+    }
+    index: dict = {}
+    for key, d in lore_dirs.items():
+        mapping: dict = {}
+        if os.path.isdir(d):
+            for fname in os.listdir(d):
+                if fname.endswith(".md"):
+                    basename = fname[:-3]
+                    mapping[basename.lower()] = basename
+        index[key] = mapping
+    return index
+
+
+def _lore_link(name: str, folder_key: str, lore_index: dict, display: str = "") -> str:
+    """Return '[[ActualFile|display]]' for a lore note, fuzzy-matching against the vault.
+
+    Resolution order:
+      1. Exact filename match
+      2. Case-insensitive exact match
+      3. Normalised match (collapse whitespace, strip punctuation differences)
+      4. Prefix match (file starts with name or vice-versa)
+      5. No match — return [[name]] so it shows as an unresolved link rather than plain text
+    """
+    if not name:
+        return ""
+    display = display or name
+    idx = lore_index.get(folder_key, {})
+
+    def _make_link(actual: str) -> str:
+        return f"[[{actual}|{display}]]" if actual != display else f"[[{actual}]]"
+
+    # 1. Exact
+    if name in idx.values():
+        return _make_link(name)
+    # 2. Case-insensitive
+    key = name.lower()
+    if key in idx:
+        return _make_link(idx[key])
+    # 3. Normalised (collapse whitespace, remove common punctuation variations)
+    norm = re.sub(r"['''\-/]", " ", key)
+    norm = re.sub(r"\s+", " ", norm).strip()
+    for k, v in idx.items():
+        k_norm = re.sub(r"['''\-/]", " ", k)
+        k_norm = re.sub(r"\s+", " ", k_norm).strip()
+        if norm == k_norm:
+            return _make_link(v)
+    # 4. Prefix match
+    for k, v in idx.items():
+        if k.startswith(key) or key.startswith(k):
+            return _make_link(v)
+    # 5. Fallback — unresolved wikilink (visible in vault, user can fix)
+    return f"[[{name}|{display}]]" if display != name else f"[[{name}]]"
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -698,10 +766,16 @@ def main():
             pass  # fall back to placeholder
 
     # ── Build note ─────────────────────────────────────────────────────────
+    # Build vault-aware lore index so links resolve against files that actually exist.
+    lore_index = _build_lore_index(vault_path)
+
     def link(val): return f"'[[{val}]]'" if val else "''"
+    def lore_link(val, folder):
+        return f"'{_lore_link(val, folder, lore_index)}'" if val else "''"
     def subclass_link(sub, cls):
         # Vault names subclasses "SubclassName (ClassName).md"
-        return f"'[[{sub} ({cls})|{sub}]]'" if sub else "''"
+        note_name = f"{sub} ({cls})"
+        return f"'{_lore_link(note_name, 'subclasses', lore_index, display=sub)}'" if sub else "''"
 
     # Languages need path-qualified links to avoid colliding with same-named race notes
     lang_yaml   = "\n".join(f"  - '[[Campaign/Lore/Languages/{l}|{l}]]'" for l in languages) if languages else "  []"
@@ -723,10 +797,10 @@ tags:
 art: "{art_field}"
 playedBy: ''
 aliases:
-species: {link(race_name)}
-class: {link(primary_cls)}
+species: {lore_link(race_name, "races") or lore_link(race_name, "species")}
+class: {lore_link(primary_cls, "classes")}
 subclass: {subclass_link(primary_sub, primary_cls)}
-background: {link(bg_name)}
+background: {lore_link(bg_name, "backgrounds")}
 alignment: '{alignment_str}'
 gender: '{gender}'
 pronouns: ''
