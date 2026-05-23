@@ -34,7 +34,7 @@ module.exports = async (params) => {
 
   // Relations base is generated from an inline template so there is no
   // external source file that can go missing.
-  const relationsContent = buildRelationsBase(`party${partyN}Relation`);
+  const relationsContent = buildRelationsBase(`party${partyN}Relation`, partyName);
   await app.vault.create(
     `${dbFolderPath}/Database - ${partyName} Relations.base`,
     relationsContent
@@ -91,7 +91,7 @@ async function copyBase(app, srcPath, destPath) {
 }
 
 // Builds the Relations base YAML with the correct party relation field name.
-function buildRelationsBase(relationField) {
+function buildRelationsBase(relationField, partyName) {
   return `properties:
   file.name:
     displayName: Name
@@ -199,6 +199,7 @@ views:
             - '!condition.contains("Dead")'
             - condition.isEmpty()
         - '!file.tags.contains("Player")'
+        - whichParty.contains("[[${partyName}]]")
     order:
       - file.name
       - aliases

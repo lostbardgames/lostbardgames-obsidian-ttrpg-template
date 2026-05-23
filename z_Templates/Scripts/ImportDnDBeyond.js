@@ -44,18 +44,15 @@ async function createFolderSafe(app, path) {
     try { await app.vault.createFolder(path); } catch (_) {}
 }
 
-function buildRelationsBase(relationField) {
+function buildRelationsBase(relationField, partyName) {
     const views = ["Family", "Allies", "Friends", "Enemy"].map(name => {
-        const filter = name === "Enemy"
-            ? `${relationField}.contains("Enemy")`
-            : `${relationField}.contains("${name === "Allies" ? "Ally" : name.slice(0,-1)}")`;
-        // Simpler: just use the name directly
+        const filterValue = name === "Allies" ? "Ally" : name === "Friends" ? "Friend" : name;
         return `  - type: cards
     name: ${name}
     filters:
       and:
         - file.inFolder("Campaign/Characters")
-        - ${relationField}.contains("${name === "Allies" ? "Ally" : name === "Friends" ? "Friend" : name === "Enemy" ? "Enemy" : "Family"}")
+        - ${relationField}.contains("${filterValue}")
         - or:
             - '!condition.contains("Dead")'
             - condition.isEmpty()
@@ -82,6 +79,7 @@ ${views.join("\n")}
             - '!condition.contains("Dead")'
             - condition.isEmpty()
         - '!file.tags.contains("Player")'
+        - whichParty.contains("[[${partyName}]]")
     order:
       - file.name
     image: note.art
@@ -110,7 +108,7 @@ async function ensureParty(app, partyName) {
     // Relations base
     await app.vault.create(
         `${dbFolder}/Database - ${partyName} Relations.base`,
-        buildRelationsBase(`party${partyN}Relation`)
+        buildRelationsBase(`party${partyN}Relation`, partyName)
     );
 
     // Party dashboard from template

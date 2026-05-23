@@ -4,15 +4,25 @@ module.exports = async (params) => {
   const partyName = await selectFromFolder(app, qa, "Campaign/Parties/Party Dashboards", "Party", true);
   if (partyName === null) return;
 
-  const sessionNum = getNextSessionNumber(app);
+  const sessionNum = getNextSessionNumber(app, partyName);
 
   const name = await qa.inputPrompt("New Session Notes", `Enter session title (e.g. Session ${sessionNum})...`);
   if (!name) return;
 
-  const destPath = `Campaign/Parties/Session Notes/${name}.md`;
+  // Save into party-specific subfolder so the dashboard query is scoped per party
+  const subfolder = partyName
+    ? `Campaign/Parties/Session Notes/${partyName}`
+    : `Campaign/Parties/Session Notes`;
+  const destPath = `${subfolder}/${name}.md`;
+
   if (app.vault.getAbstractFileByPath(destPath)) {
     new Notice(`"${name}" already exists!`);
     return;
+  }
+
+  // Ensure the party subfolder exists
+  if (partyName && !app.vault.getAbstractFileByPath(subfolder)) {
+    await app.vault.createFolder(subfolder).catch(() => {});
   }
 
   const tpl = app.vault.getAbstractFileByPath("z_Templates/Story/Template - Session Notes.md");
@@ -30,10 +40,19 @@ module.exports = async (params) => {
   new Notice(`"${name}" created (Session ${sessionNum})!`);
 };
 
-function getNextSessionNumber(app) {
-  const folder = app.vault.getAbstractFileByPath("Campaign/Parties/Session Notes");
-  if (!folder?.children) return 1;
-  return folder.children.filter(f => !("children" in f) && f.extension === "md").length + 1;
+function getNextSessionNumber(app, partyName) {
+  // Count sessions across both the party subfolder and the flat root
+  let count = 0;
+  const roots = partyName
+    ? [`Campaign/Parties/Session Notes/${partyName}`, "Campaign/Parties/Session Notes"]
+    : ["Campaign/Parties/Session Notes"];
+  for (const root of roots) {
+    const folder = app.vault.getAbstractFileByPath(root);
+    if (folder?.children) {
+      count += folder.children.filter(f => !("children" in f) && f.extension === "md").length;
+    }
+  }
+  return count + 1;
 }
 
 async function selectFromFolder(app, qa, folderPath, label, allowSkip = false) {

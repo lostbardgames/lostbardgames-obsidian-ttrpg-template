@@ -91,7 +91,7 @@ TABLE WITHOUT ID
   sessionNumber as "#",
   sessionDate as "Date",
   summary as "Summary"
-FROM "Campaign/Parties/Session Notes"
+FROM "Campaign/Parties/Session Notes/Party 1"
 WHERE econtains(tags,"SessionNote")
 SORT sessionNumber DESC
 LIMIT 5

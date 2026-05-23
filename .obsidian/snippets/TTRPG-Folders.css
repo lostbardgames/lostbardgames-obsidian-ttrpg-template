@@ -242,3 +242,17 @@
 .theme-light .nav-folder-title[data-path="Campaign/Possessions"] .nav-folder-title-content         { color: #4a5568 !important; }
 .theme-light .nav-folder-title[data-path="Campaign/Possessions/Items"] .nav-folder-title-content   { color: #00838f !important; }
 .theme-light .nav-folder-title[data-path="Campaign/Possessions/Spells"] .nav-folder-title-content  { color: #5541c9 !important; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   INFOBOX FLOAT CLEAR
+   The [!infobox] callout uses float:right. Database embeds (.base)
+   and headings that follow need to clear that float so they start
+   below the infobox rather than wrapping alongside it.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.markdown-preview-view .internal-embed[src$=".base"],
+.markdown-preview-view h1,
+.markdown-preview-view h2,
+.markdown-preview-view h3 {
+  clear: both;
+}

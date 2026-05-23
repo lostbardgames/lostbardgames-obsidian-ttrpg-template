@@ -1,8 +1,12 @@
 module.exports = async (params) => {
   const { app, quickAddApi: qa } = params;
 
-  const regionName = await selectFromFolder(app, qa, "Campaign/Regions", "Region", true);
-  if (regionName === null) return;
+  const settlementFolders = [
+    { path: "Campaign/Regions", type: "Region" },
+    { path: "Campaign/Areas",   type: "Area" },
+  ];
+  const locationName = await selectParentLocation(app, qa, settlementFolders, "Parent Location");
+  if (locationName === null) return;
 
   const name = await qa.inputPrompt("New Settlement", "Enter settlement name...");
   if (!name) return;
@@ -17,31 +21,37 @@ module.exports = async (params) => {
   if (!tpl) { new Notice("Settlement template not found!"); return; }
 
   let content = await app.vault.read(tpl);
-  if (regionName) content = setSingleField(content, "location", regionName);
+  if (locationName) content = setSingleField(content, "currentLocation", locationName);
 
   const file = await app.vault.create(destPath, content);
   await getMainLeaf(app).openFile(file);
   new Notice(`"${name}" created!`);
 };
 
-async function selectFromFolder(app, qa, folderPath, label, allowSkip = false) {
-  const folder = app.vault.getAbstractFileByPath(folderPath);
-  const existing = (folder?.children || [])
-    .filter(f => !("children" in f) && f.extension === "md")
-    .map(f => f.basename);
+async function selectParentLocation(app, qa, locationFolders, promptTitle) {
+  const existing = [];
+  for (const { path, type } of locationFolders) {
+    const folder = app.vault.getAbstractFileByPath(path);
+    if (folder?.children) {
+      const group = folder.children
+        .filter(f => !("children" in f) && f.extension === "md")
+        .map(f => ({ display: `${f.basename}  [${type}]`, value: f.basename }));
+      group.sort((a, b) => a.value.localeCompare(b.value));
+      existing.push(...group);
+    }
+  }
   const SKIP = "[ None / Skip ]";
   const NEW = "＋ Enter New Name";
-  const opts = [...existing];
-  if (allowSkip) opts.push(SKIP);
-  opts.push(NEW);
-  const choice = await qa.suggester(opts, opts);
+  const displays = [...existing.map(e => e.display), SKIP, NEW];
+  const choice = await qa.suggester(displays, displays);
   if (!choice) return null;
   if (choice === SKIP) return "";
   if (choice === NEW) {
-    const n = await qa.inputPrompt(`${label} Name`, "Enter name...");
+    const n = await qa.inputPrompt(promptTitle || "Parent Location Name", "Enter location name...");
     return n || null;
   }
-  return choice;
+  const found = existing.find(e => e.display === choice);
+  return found ? found.value : null;
 }
 
 function setSingleField(content, field, value) {

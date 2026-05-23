@@ -18,7 +18,7 @@ module.exports = async (params) => {
 
   let content = await app.vault.read(tpl);
   if (settlementName) {
-    content = setSingleField(content, "location", settlementName);
+    content = setSingleField(content, "currentLocation", settlementName);
     content = setSingleField(content, "parentSettlement", settlementName);
   }
 

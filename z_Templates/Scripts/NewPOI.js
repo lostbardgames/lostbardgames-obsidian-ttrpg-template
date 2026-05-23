@@ -1,7 +1,13 @@
 module.exports = async (params) => {
   const { app, quickAddApi: qa } = params;
 
-  const locationName = await selectParentLocation(app, qa);
+  const poiFolders = [
+    { path: "Campaign/Regions",     type: "Region" },
+    { path: "Campaign/Settlements", type: "Settlement" },
+    { path: "Campaign/Districts",   type: "District" },
+    { path: "Campaign/Areas",       type: "Area" },
+  ];
+  const locationName = await selectParentLocation(app, qa, poiFolders, "Parent Location");
   if (locationName === null) return;
 
   const name = await qa.inputPrompt("New Point of Interest", "Enter POI name...");
@@ -27,59 +33,30 @@ module.exports = async (params) => {
   new Notice(`"${name}" created!`);
 };
 
-async function selectParentLocation(app, qa) {
-  const locationFolders = [
-    "Campaign/Settlements",
-    "Campaign/Districts",
-    "Campaign/Areas",
-  ];
+async function selectParentLocation(app, qa, locationFolders, promptTitle) {
   const existing = [];
-  for (const fp of locationFolders) {
-    const folder = app.vault.getAbstractFileByPath(fp);
+  for (const { path, type } of locationFolders) {
+    const folder = app.vault.getAbstractFileByPath(path);
     if (folder?.children) {
-      folder.children
+      const group = folder.children
         .filter(f => !("children" in f) && f.extension === "md")
-        .forEach(f => existing.push(f.basename));
+        .map(f => ({ display: `${f.basename}  [${type}]`, value: f.basename }));
+      group.sort((a, b) => a.value.localeCompare(b.value));
+      existing.push(...group);
     }
   }
-  existing.sort();
   const SKIP = "[ None / Skip ]";
-  const NEW = "＋ Create New Location";
-  const opts = [...existing, SKIP, NEW];
-  const choice = await qa.suggester(opts, opts);
+  const NEW = "＋ Enter New Name";
+  const displays = [...existing.map(e => e.display), SKIP, NEW];
+  const choice = await qa.suggester(displays, displays);
   if (!choice) return null;
   if (choice === SKIP) return "";
   if (choice === NEW) {
-    const n = await qa.inputPrompt("New Location Name", "Enter location name...");
-    if (!n) return null;
-
-    // Ask what type of location to create
-    const typeOpts = ["Settlement", "District", "Area"];
-    const type = await qa.suggester(typeOpts, typeOpts);
-    if (!type) return null;
-
-    const templateMap = {
-      "Settlement": "z_Templates/Locations/Template - Settlement.md",
-      "District":   "z_Templates/Locations/Template - District.md",
-      "Area":       "z_Templates/Locations/Template - Area.md",
-    };
-    const folderMap = {
-      "Settlement": "Campaign/Settlements",
-      "District":   "Campaign/Districts",
-      "Area":       "Campaign/Areas",
-    };
-
-    const destPath = `${folderMap[type]}/${n}.md`;
-    if (!app.vault.getAbstractFileByPath(destPath)) {
-      const tpl = app.vault.getAbstractFileByPath(templateMap[type]);
-      const content = tpl ? await app.vault.read(tpl) : `---\ntags:\n  - ${type}\n---\n\n# ${n}\n\n`;
-      await app.vault.create(destPath, content);
-      new Notice(`${type} "${n}" created!`);
-    }
-
-    return n;
+    const n = await qa.inputPrompt(promptTitle || "Parent Location Name", "Enter location name...");
+    return n || null;
   }
-  return choice;
+  const found = existing.find(e => e.display === choice);
+  return found ? found.value : null;
 }
 
 function setSingleField(content, field, value) {

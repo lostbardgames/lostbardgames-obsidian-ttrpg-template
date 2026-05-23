@@ -1,7 +1,12 @@
 module.exports = async (params) => {
   const { app, quickAddApi: qa } = params;
 
-  const locationName = await selectParentLocation(app, qa);
+  const areaFolders = [
+    { path: "Campaign/Settlements", type: "Settlement" },
+    { path: "Campaign/Regions",     type: "Region" },
+    { path: "Campaign/Worlds",      type: "World" },
+  ];
+  const locationName = await selectParentLocation(app, qa, areaFolders, "Parent Location");
   if (locationName === null) return;
 
   const name = await qa.inputPrompt("New Area", "Enter area name...");
@@ -24,33 +29,30 @@ module.exports = async (params) => {
   new Notice(`"${name}" created!`);
 };
 
-async function selectParentLocation(app, qa) {
-  const locationFolders = [
-    "Campaign/Settlements",
-    "Campaign/Regions",
-    "Campaign/Worlds",
-  ];
+async function selectParentLocation(app, qa, locationFolders, promptTitle) {
   const existing = [];
-  for (const fp of locationFolders) {
-    const folder = app.vault.getAbstractFileByPath(fp);
+  for (const { path, type } of locationFolders) {
+    const folder = app.vault.getAbstractFileByPath(path);
     if (folder?.children) {
-      folder.children
+      const group = folder.children
         .filter(f => !("children" in f) && f.extension === "md")
-        .forEach(f => existing.push(f.basename));
+        .map(f => ({ display: `${f.basename}  [${type}]`, value: f.basename }));
+      group.sort((a, b) => a.value.localeCompare(b.value));
+      existing.push(...group);
     }
   }
-  existing.sort();
   const SKIP = "[ None / Skip ]";
   const NEW = "＋ Enter New Name";
-  const opts = [...existing, SKIP, NEW];
-  const choice = await qa.suggester(opts, opts);
+  const displays = [...existing.map(e => e.display), SKIP, NEW];
+  const choice = await qa.suggester(displays, displays);
   if (!choice) return null;
   if (choice === SKIP) return "";
   if (choice === NEW) {
-    const n = await qa.inputPrompt("Parent Location Name", "Enter location name...");
+    const n = await qa.inputPrompt(promptTitle || "Parent Location Name", "Enter location name...");
     return n || null;
   }
-  return choice;
+  const found = existing.find(e => e.display === choice);
+  return found ? found.value : null;
 }
 
 function setSingleField(content, field, value) {
