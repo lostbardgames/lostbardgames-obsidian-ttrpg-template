@@ -2,11 +2,11 @@
 tags:
   - Homepage
 campaignName: My Campaign
-activeParty: ""
+activeParty:
 cssclasses:
   - wide-page
 ---
-
++
 # 🏰 `VIEW[{campaignName}][link]`
 
 Adventure: `INPUT[suggester(optionQuery("Campaign/Parties/Adventures")):campaignName]` Party: `INPUT[suggester(optionQuery("Campaign/Parties/Party Dashboards")):activeParty]`

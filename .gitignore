@@ -25,3 +25,6 @@ files.json
 
 # ── Claude project memory (local only, never pushed to GitHub) ────────────────
 CLAUDE.md
+
+# ── Repo meta-files (not part of the vault users receive) ────────────────────
+README.md

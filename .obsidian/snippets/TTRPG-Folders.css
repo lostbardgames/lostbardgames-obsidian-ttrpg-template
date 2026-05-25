@@ -144,8 +144,23 @@
 .nav-folder-title[data-path="Campaign/Lore/Classes/Subclasses"] .nav-folder-title-content::before { content: "🎯 "; }
 .nav-folder-title[data-path="Campaign/Lore/Classes/Subclasses"] .nav-folder-title-content { color: #e67e22 !important; }
 
+.nav-folder-title[data-path="Campaign/Lore/Classes/Features"] .nav-folder-title-content::before { content: "📋 "; }
+.nav-folder-title[data-path="Campaign/Lore/Classes/Features"] .nav-folder-title-content { color: #fd9644 !important; }
+
 .nav-folder-title[data-path="Campaign/Lore/Races"] .nav-folder-title-content::before { content: "🧬 "; }
 .nav-folder-title[data-path="Campaign/Lore/Races"] .nav-folder-title-content { color: #00cec9 !important; }
+
+.nav-folder-title[data-path="Campaign/Lore/Species"] .nav-folder-title-content::before { content: "🧬 "; }
+.nav-folder-title[data-path="Campaign/Lore/Species"] .nav-folder-title-content { color: #00cec9 !important; }
+
+.nav-folder-title[data-path="Campaign/Lore/Ancestries"] .nav-folder-title-content::before { content: "🧬 "; }
+.nav-folder-title[data-path="Campaign/Lore/Ancestries"] .nav-folder-title-content { color: #00cec9 !important; }
+
+.nav-folder-title[data-path="Campaign/Lore/Ancestries/Heritages"] .nav-folder-title-content::before { content: "🌿 "; }
+.nav-folder-title[data-path="Campaign/Lore/Ancestries/Heritages"] .nav-folder-title-content { color: #55efc4 !important; }
+
+.nav-folder-title[data-path="Campaign/Lore/Actions"] .nav-folder-title-content::before { content: "⚡ "; }
+.nav-folder-title[data-path="Campaign/Lore/Actions"] .nav-folder-title-content { color: #fd9644 !important; }
 
 .nav-folder-title[data-path="Campaign/Lore/Backgrounds"] .nav-folder-title-content::before { content: "📜 "; }
 .nav-folder-title[data-path="Campaign/Lore/Backgrounds"] .nav-folder-title-content { color: #c9a84c !important; }
@@ -230,7 +245,12 @@
 .theme-light .nav-folder-title[data-path="Campaign/Lore"] .nav-folder-title-content                    { color: #4a5568 !important; }
 .theme-light .nav-folder-title[data-path="Campaign/Lore/Classes"] .nav-folder-title-content            { color: #c0392b !important; }
 .theme-light .nav-folder-title[data-path="Campaign/Lore/Classes/Subclasses"] .nav-folder-title-content { color: #b8520a !important; }
+.theme-light .nav-folder-title[data-path="Campaign/Lore/Classes/Features"] .nav-folder-title-content   { color: #d35400 !important; }
 .theme-light .nav-folder-title[data-path="Campaign/Lore/Races"] .nav-folder-title-content              { color: #00838f !important; }
+.theme-light .nav-folder-title[data-path="Campaign/Lore/Species"] .nav-folder-title-content            { color: #00838f !important; }
+.theme-light .nav-folder-title[data-path="Campaign/Lore/Ancestries"] .nav-folder-title-content         { color: #00838f !important; }
+.theme-light .nav-folder-title[data-path="Campaign/Lore/Ancestries/Heritages"] .nav-folder-title-content { color: #00897b !important; }
+.theme-light .nav-folder-title[data-path="Campaign/Lore/Actions"] .nav-folder-title-content            { color: #d35400 !important; }
 .theme-light .nav-folder-title[data-path="Campaign/Lore/Backgrounds"] .nav-folder-title-content        { color: #7d6608 !important; }
 .theme-light .nav-folder-title[data-path="Campaign/Lore/Feats"] .nav-folder-title-content              { color: #b7770d !important; }
 .theme-light .nav-folder-title[data-path="Campaign/Lore/Conditions"] .nav-folder-title-content         { color: #c0392b !important; }

@@ -116,6 +116,9 @@ def write_note(path: Path, content: str) -> bool:
     if key in _WRITTEN_PATHS or path.exists():
         return False
     _WRITTEN_PATHS.add(key)
+    # Inject import tracking field so the vault can identify and clean up imported notes
+    if content.startswith("---\n"):
+        content = '---\nimport_source: "pf2etools"\n' + content[4:]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
     _NOTES_WRITTEN += 1
@@ -221,7 +224,8 @@ def fetch_entries(index_or_path: str, top_key: str, source_filter: str) -> list:
 
 def import_spells(vault: Path, source_filter: str) -> int:
     print("  Fetching spells…", file=sys.stderr)
-    out_dir = vault / "Campaign" / "Lore" / "Spells"
+    out_dir = vault / "Campaign" / "Possessions" / "Spells"
+    out_dir.mkdir(parents=True, exist_ok=True)
     written = 0
     entries = fetch_entries("spells/index.json", "spell", source_filter)
     for s in entries:
@@ -410,13 +414,38 @@ summary: ""
     return written
 
 
+def _load_ancestry_files(source_filter: str):
+    """
+    Yield (ancestry_entry, filename) pairs from pf2etools ancestry data.
+
+    The ancestry index maps ancestry-name → filename (e.g. "dwarf" →
+    "ancestry-dwarf.json").  The keys are NOT source codes, so we must
+    load every file and filter by each entry's own ``source`` field.
+    Duplicate filenames in the index are visited only once.
+    """
+    index = fetch_index("ancestries/index.json")
+    seen_files: set = set()
+    for filename in index.values():
+        if filename in seen_files:
+            continue
+        seen_files.add(filename)
+        url  = f"{DATA_BASE}/ancestries/{filename}"
+        data = http_get_json_safe(url)
+        if not data or "ancestry" not in data:
+            continue
+        for entry in data["ancestry"]:
+            yield entry
+
+
 def import_ancestries(vault: Path, source_filter: str) -> int:
     print("  Fetching ancestries…", file=sys.stderr)
     out_dir = vault / "Campaign" / "Lore" / "Ancestries"
     out_dir.mkdir(parents=True, exist_ok=True)
     written = 0
-    entries = fetch_entries("ancestries/index.json", "ancestry", source_filter)
-    for a in entries:
+
+    for a in _load_ancestry_files(source_filter):
+        if not source_ok(a, source_filter):
+            continue
         name = a.get("name", "")
         if not name:
             continue
@@ -425,7 +454,7 @@ def import_ancestries(vault: Path, source_filter: str) -> int:
         speed  = a.get("speed") or {}
         speed_str = str(speed.get("walk", "")) if isinstance(speed, dict) else str(speed)
         boosts = a.get("boosts") or []
-        flaws  = a.get("flaws") or []
+        flaws  = a.get("flaws") or a.get("flaw") or []
         langs  = a.get("languages") or []
         traits = traits_str(a)
         source = a.get("source", "")
@@ -489,24 +518,31 @@ SORT file.name ASC
 def import_heritages(vault: Path, source_filter: str) -> int:
     print("  Fetching heritages…", file=sys.stderr)
     out_dir = vault / "Campaign" / "Lore" / "Ancestries" / "Heritages"
+    out_dir.mkdir(parents=True, exist_ok=True)
     written = 0
-    # Heritages are embedded in ancestry files under the "heritage" key
-    entries = fetch_entries("ancestries/index.json", "heritage", source_filter)
-    for h in entries:
-        name   = h.get("name", "")
-        parent = h.get("ancestry") or {}
-        parent_name = parent.get("name", "") if isinstance(parent, dict) else str(parent)
-        source = h.get("source", "")
-        page   = h.get("page", "")
-        traits = traits_str(h)
-        desc   = entries_to_md(h.get("entries"))
 
-        content = f"""---
+    # Heritages live inside each ancestry object under the "heritage" key,
+    # NOT as a top-level key in the file.  Iterate ancestry files and pull
+    # h from a["heritage"] for each ancestry entry a.
+    for a in _load_ancestry_files(source_filter):
+        ancestry_name = a.get("name", "")
+        for h in (a.get("heritage") or []):
+            if not source_ok(h, source_filter):
+                continue
+            name = h.get("name", "")
+            if not name:
+                continue
+            source = h.get("source", "")
+            page   = h.get("page", "")
+            traits = traits_str(h)
+            desc   = entries_to_md(h.get("entries"))
+
+            content = f"""---
 tags:
   - Heritage
   - PF2e
 name: {name}
-parentAncestry: "[[{parent_name}]]"
+parentAncestry: "[[{ancestry_name}]]"
 traits: {json.dumps(h.get("traits") or [])}
 source: {source}
 page: {page}
@@ -529,8 +565,8 @@ summary: ""
 ## Notes
 
 """
-        fname = sanitize(name)
-        written += write_note(out_dir / f"{fname}.md", content)
+            fname = sanitize(name)
+            written += write_note(out_dir / f"{fname}.md", content)
     print(f"    → {written} heritages written", file=sys.stderr)
     return written
 

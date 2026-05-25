@@ -54,8 +54,15 @@ _SSL_CTX = _make_ssl_context()
 VAULT = Path(".")  # overridden by --vault argument at runtime
 BASE_URL = "https://raw.githubusercontent.com/5etools-mirror-3/5etools-src/main/data"
 
-WOTC_SOURCES = {
-    "PHB", "XPHB", "DMG", "XDMG", "MM", "XGE", "TCE", "SCAG",
+# Active game system — overridden by --system argument at runtime.
+# Controls folder routing (Races vs Species) and default source filter.
+SYSTEM = "dnd5e"
+
+# ── Edition source sets ────────────────────────────────────────────────────────
+
+# D&D 5e 2014 — all WotC sources, explicitly excluding the 2024 revised books
+SOURCES_5E_2014 = {
+    "PHB", "DMG", "MM", "XGE", "TCE", "SCAG",
     "GGR", "AI", "ERLW", "EGW", "MOT", "FTD", "SCC", "LoX",
     "DSotDQ", "KftGV", "BMT", "AAG", "SAiS", "HAT-TG", "HAT-LMI",
     "SRD", "BasicRules", "PSI", "PSZ", "PSK", "PSX", "PSA",
@@ -65,6 +72,34 @@ WOTC_SOURCES = {
     "MaBJoV", "LLK", "LR", "DC", "SLW", "IMR", "SADS", "EET",
     "MTF", "VGM", "MFF", "MPMM", "BGG", "MPP", "TDCSR",
 }
+
+# D&D 5.5e 2024 — core rulebooks and supplements published under / compatible with 2024 rules
+SOURCES_5E_2024 = {
+    # Core rulebooks (2024 revised editions)
+    "XPHB", "XDMG", "XMM",
+    # Adventures & supplements released for the 2024 edition
+    "QftIS",  # Quests from the Infinite Staircase (2024)
+    # Pre-2024 supplements that remain widely used alongside the 2024 rules
+    "XGE",   # Xanathar's Guide to Everything
+    "TCE",   # Tasha's Cauldron of Everything
+    "SCAG",  # Sword Coast Adventurer's Guide (spells)
+    "MPMM",  # Mordenkainen Presents: Monsters of the Multiverse (updated races)
+}
+
+# Combined set (used when source_filter is None / "all WotC")
+WOTC_SOURCES = SOURCES_5E_2014 | SOURCES_5E_2024
+
+# Content types available per edition
+CONTENT_TYPES_5E_2014 = [
+    "spells", "items", "backgrounds", "classes", "classfeatures",
+    "races", "racialtraits", "backgroundfeatures",
+    "languages", "deities", "feats", "conditions", "optionalfeatures",
+]
+CONTENT_TYPES_5E_2024 = [
+    "spells", "items", "backgrounds", "classes", "classfeatures",
+    "races", "racialtraits",
+    "languages", "deities", "feats", "conditions", "optionalfeatures",
+]
 
 SCHOOL_MAP = {
     "A": "Abjuration", "C": "Conjuration", "D": "Divination",
@@ -108,9 +143,8 @@ OPTIONAL_FEATURE_TYPE_MAP = {
     "TD": "Totem Feature", "TP": "Tunnel Perception",
 }
 
-CONTENT_TYPES = ["spells", "items", "backgrounds", "classes", "classfeatures", "races",
-                 "racialtraits", "backgroundfeatures", "languages", "deities", "feats",
-                 "conditions", "optionalfeatures"]
+# All possible content types across both editions (used for --type argparse choices)
+CONTENT_TYPES = sorted(set(CONTENT_TYPES_5E_2014) | set(CONTENT_TYPES_5E_2024))
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
 
@@ -135,6 +169,21 @@ def sanitize_filename(name: str) -> str:
     return name
 
 
+def _link_name(raw: str) -> str:
+    """Normalize a 5e.tools tag name to the vault filename it was written as.
+
+    Uses title-case (to match how the file was created from the master data)
+    but does NOT capitalize the letter immediately after an apostrophe —
+    Python's .title() incorrectly produces "Bigby'S Hand" from "bigby's hand".
+    Also applies sanitize_filename so slashes become dashes (e.g. Enlarge-Reduce).
+    """
+    titled = raw.title()
+    # Fix apostrophe-capitalisation bug: "Bigby'S Hand" → "Bigby's Hand"
+    titled = re.sub(r"(['‘’])([A-Z])",
+                    lambda m: m.group(1) + m.group(2).lower(), titled)
+    return sanitize_filename(titled)
+
+
 def yaml_str(value: Any) -> str:
     if value is None:
         return ""
@@ -154,33 +203,36 @@ def yaml_list(items: list) -> str:
 def convert_tags(text: str) -> str:
     """Convert 5e.tools {@tag} notation to Obsidian wikilinks or plain text."""
     # Link-worthy tags → wikilinks
+    # _link_name() applies proper title-case + sanitize_filename so the link
+    # target matches the actual vault filename (fixes slashes, apostrophes, etc.)
     for tag in ("condition", "disease", "status"):
         text = re.sub(rf'\{{@{tag} ([^}}|]+)(?:\|[^}}]*)?\}}',
-                      lambda m: f'[[{m.group(1).title()}]]', text)
+                      lambda m: f'[[{_link_name(m.group(1))}]]', text)
     for tag in ("spell",):
         text = re.sub(rf'\{{@{tag} ([^}}|]+)(?:\|[^}}]*)?\}}',
-                      lambda m: f'[[{m.group(1).title()}]]', text)
+                      lambda m: f'[[{_link_name(m.group(1))}]]', text)
     for tag in ("item",):
         text = re.sub(rf'\{{@{tag} ([^}}|]+)(?:\|[^}}]*)?\}}',
-                      lambda m: f'[[{m.group(1).title()}]]', text)
+                      lambda m: f'[[{_link_name(m.group(1))}]]', text)
     for tag in ("feat",):
         text = re.sub(rf'\{{@{tag} ([^}}|]+)(?:\|[^}}]*)?\}}',
-                      lambda m: f'[[{m.group(1).title()}]]', text)
+                      lambda m: f'[[{_link_name(m.group(1))}]]', text)
     for tag in ("race",):
+        # The regex already strips the |Source suffix; group(1) is the bare name
         text = re.sub(rf'\{{@{tag} ([^}}|]+)(?:\|[^}}]*)?\}}',
-                      lambda m: f'[[{m.group(1).split("|")[0].title()}]]', text)
+                      lambda m: f'[[{_link_name(m.group(1))}]]', text)
     for tag in ("class",):
         text = re.sub(rf'\{{@{tag} ([^}}|]+)(?:\|[^}}]*)?\}}',
-                      lambda m: f'[[{m.group(1).title()}]]', text)
+                      lambda m: f'[[{_link_name(m.group(1))}]]', text)
     for tag in ("language",):
         text = re.sub(rf'\{{@{tag} ([^}}|]+)(?:\|[^}}]*)?\}}',
-                      lambda m: f'[[{m.group(1).title()}]]', text)
+                      lambda m: f'[[{_link_name(m.group(1))}]]', text)
     for tag in ("background",):
         text = re.sub(rf'\{{@{tag} ([^}}|]+)(?:\|[^}}]*)?\}}',
-                      lambda m: f'[[{m.group(1).title()}]]', text)
+                      lambda m: f'[[{_link_name(m.group(1))}]]', text)
     for tag in ("optfeature",):
         text = re.sub(rf'\{{@{tag} ([^}}|]+)(?:\|[^}}]*)?\}}',
-                      lambda m: f'[[{m.group(1).title()}]]', text)
+                      lambda m: f'[[{_link_name(m.group(1))}]]', text)
 
     # Plain text substitutions
     text = re.sub(r'\{@damage ([^}]+)\}', r'\1', text)
@@ -364,14 +416,14 @@ def format_prerequisite(prereqs: list) -> str:
             if "feat" in p:
                 for feat in p["feat"]:
                     fname = feat.split("|")[0]
-                    sub.append(f"[[{fname.title()}]]")
+                    sub.append(f"[[{_link_name(fname)}]]")
             if "race" in p:
                 for race in p["race"]:
                     rname = race.get("name", "")
-                    sub.append(f"[[{rname.title()}]]")
+                    sub.append(f"[[{_link_name(rname)}]]")
             if "class" in p:
                 cname = p["class"].get("name", "")
-                sub.append(f"[[{cname.title()}]]")
+                sub.append(f"[[{_link_name(cname)}]]")
             if "other" in p:
                 sub.append(p["other"])
             if "campaign" in p:
@@ -426,6 +478,9 @@ def write_note(path: Path, content: str) -> bool:
     if key in _WRITTEN_PATHS or path.exists():
         return False
     _WRITTEN_PATHS.add(key)
+    # Inject import tracking field so the vault can identify and clean up imported notes
+    if content.startswith("---\n"):
+        content = '---\nimport_source: "5etools"\n' + content[4:]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
     return True
@@ -1566,7 +1621,8 @@ def _collect_feature(feature: dict, feature_map: dict, subclass_short: str) -> N
 # ── Racial trait importer ───────────────────────────────────────────────────────
 
 def import_racial_traits(source_filter: set) -> int:
-    out_dir = VAULT / "Campaign/Lore/Races/Traits"
+    folder = "Species" if SYSTEM == "dnd5e_2024" else "Races"
+    out_dir = VAULT / f"Campaign/Lore/{folder}/Traits"
     # Clear existing notes so multi-race notes replace single-race ones
     if out_dir.exists():
         for f in out_dir.iterdir():
@@ -1759,7 +1815,8 @@ def _dedup(entries: list, key_fn) -> list:
 
 
 def import_races(source_filter: set) -> int:
-    out_dir = VAULT / "Campaign/Lore/Races"
+    folder = "Species" if SYSTEM == "dnd5e_2024" else "Races"
+    out_dir = VAULT / f"Campaign/Lore/{folder}"
 
     data = fetch_json(f"{BASE_URL}/races.json")
     if not data:
@@ -1855,6 +1912,12 @@ def _write_race(race: dict, out_dir: Path, parent: Optional[str]) -> int:
     desc_body = render_entries(entries)
     parent_link = f'"[[{parent}]]"' if parent else ""
 
+    is_2024 = SYSTEM == "dnd5e_2024"
+    lore_folder = "Campaign/Lore/Species" if is_2024 else "Campaign/Lore/Races"
+    primary_tag = "Species" if is_2024 else "Race"
+    subrace_label = "Variants" if is_2024 else "Subraces"
+    flavour_prompt = "Summarize what makes this species unique." if is_2024 else "Summarize what makes this race or species unique."
+
     content = f"""---
 tags:
   - Race
@@ -1914,13 +1977,13 @@ sourcePage: {page}
 
 # `=this.file.name`
 
-> *Summarize what makes this race or species unique.*
+> *{flavour_prompt}*
 
 ## Overview
 
 ### Physical Traits
 
-> *What noticeable physical features define this race?*
+> *What noticeable physical features define this {primary_tag.lower()}?*
 
 ### Innate Abilities
 
@@ -1935,7 +1998,7 @@ sourcePage: {page}
 
 ### Culture & Society
 
-> *How does this race typically live or interact with the world?*
+> *How does this {primary_tag.lower()} typically live or interact with the world?*
 
 ### Beliefs
 
@@ -1943,14 +2006,14 @@ sourcePage: {page}
 
 ### History
 
-> *Briefly outline this race's origin or major historical events.*
+> *Briefly outline this {primary_tag.lower()}'s origin or major historical events.*
 
-## Subraces
+## {subrace_label}
 
 ```dataview
 LIST
-FROM "Campaign/Lore/Races"
-WHERE econtains(tags,"Race") AND parentRace = this.file.link
+FROM "{lore_folder}"
+WHERE econtains(tags,"{primary_tag}") AND parentRace = this.file.link
 SORT file.name ASC
 ```
 
@@ -2425,6 +2488,9 @@ isHomebrew: false
 
 def main():
     parser = argparse.ArgumentParser(description="Import 5e.tools data into Obsidian vault")
+    parser.add_argument("--system", dest="system", default="dnd5e",
+                        choices=["dnd5e", "dnd5e_2024"],
+                        help="D&D edition: dnd5e (2014 PHB) or dnd5e_2024 (2024 XPHB)")
     parser.add_argument("--all", dest="all_sources", action="store_true",
                         help="Include all sources (not just WotC)")
     parser.add_argument("--book", dest="book_filter", default=None, nargs="+",
@@ -2436,9 +2502,14 @@ def main():
                         help="Absolute path to the Obsidian vault (overrides the hardcoded VAULT path)")
     args = parser.parse_args()
 
+    global VAULT, SYSTEM
     if args.vault_path:
-        global VAULT
         VAULT = Path(args.vault_path)
+
+    SYSTEM = args.system
+    edition_types = CONTENT_TYPES_5E_2024 if SYSTEM == "dnd5e_2024" else CONTENT_TYPES_5E_2014
+    edition_label = "D&D 5.5e (2024)" if SYSTEM == "dnd5e_2024" else "D&D 5e (2014)"
+    print(f"Edition: {edition_label}")
 
     if args.book_filter:
         source_filter = set(args.book_filter)
@@ -2446,14 +2517,20 @@ def main():
     elif args.all_sources:
         source_filter = None
         print(f"Source filter: ALL sources")
+    elif SYSTEM == "dnd5e_2024":
+        source_filter = SOURCES_5E_2024
+        print(f"Source filter: 2024 core books ({', '.join(sorted(SOURCES_5E_2024))})")
     else:
-        source_filter = WOTC_SOURCES
-        print(f"Source filter: WotC only ({len(WOTC_SOURCES)} source codes)")
+        source_filter = SOURCES_5E_2014
+        print(f"Source filter: 2014 WotC books ({len(SOURCES_5E_2014)} source codes)")
     print()
 
     totals = {}
 
     def run(label, fn):
+        # Skip types not applicable to this edition
+        if label not in edition_types:
+            return
         if args.content_types and label not in args.content_types:
             return
         print(f"Importing {label}...", end=" ", flush=True)
@@ -2482,7 +2559,7 @@ def main():
     run("optionalfeatures", import_optional_features)
 
     total = sum(totals.values())
-    print(f"\nWrote {total} notes total:")  
+    print(f"\nWrote {total} notes total:")
     for k, v in totals.items():
         print(f"  {k}: {v}")
 

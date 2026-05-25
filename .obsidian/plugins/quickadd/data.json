@@ -339,35 +339,22 @@
     },
     {
       "id": "a1b2c3d4-0001-4000-8000-000000000016",
-      "name": "New Race",
-      "type": "Template",
+      "name": "New Race / Species / Ancestry",
+      "type": "Macro",
       "command": true,
-      "templatePath": "z_Templates/Lore/Template - Race.md",
-      "fileNameFormat": {
-        "enabled": false,
-        "format": ""
-      },
-      "folder": {
-        "enabled": true,
-        "folders": [
-          "Campaign/Lore/Races"
-        ],
-        "chooseWhenMultipleOptions": false,
-        "createInSameFolderAsActiveFile": false,
-        "chooseFromSubfolders": false
-      },
-      "appendLink": false,
-      "openFileInNewTab": {
-        "enabled": false,
-        "direction": "vertical",
-        "focus": true
-      },
-      "openFile": true,
-      "openFileInMode": "default",
-      "fileExistsMode": "Increment the file name",
-      "setFileExistsBehavior": false,
-      "shouldRunStartupMacro": false,
-      "format": ""
+      "macro": {
+        "id": "c3d4e5f6-0016-4000-8000-000000000001",
+        "name": "New Race / Species / Ancestry",
+        "commands": [
+          {
+            "id": "d4e5f6a7-0016-4000-8000-000000000002",
+            "name": "NewCharacterType.js",
+            "type": "UserScript",
+            "path": "z_Templates/Scripts/NewCharacterType.js",
+            "settings": {}
+          }
+        ]
+      }
     },
     {
       "id": "a1b2c3d4-0001-4000-8000-000000000017",
@@ -829,6 +816,44 @@
             "name": "SetupSystem.js",
             "type": "UserScript",
             "path": "z_Templates/Scripts/SetupSystem.js",
+            "settings": {}
+          }
+        ]
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000035",
+      "name": "New Heritage",
+      "type": "Macro",
+      "command": true,
+      "macro": {
+        "id": "c3d4e5f6-0035-4000-8000-000000000001",
+        "name": "New Heritage",
+        "commands": [
+          {
+            "id": "d4e5f6a7-0035-4000-8000-000000000002",
+            "name": "NewHeritage.js",
+            "type": "UserScript",
+            "path": "z_Templates/Scripts/NewHeritage.js",
+            "settings": {}
+          }
+        ]
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000036",
+      "name": "New Action",
+      "type": "Macro",
+      "command": true,
+      "macro": {
+        "id": "c3d4e5f6-0036-4000-8000-000000000001",
+        "name": "New Action",
+        "commands": [
+          {
+            "id": "d4e5f6a7-0036-4000-8000-000000000002",
+            "name": "NewAction.js",
+            "type": "UserScript",
+            "path": "z_Templates/Scripts/NewAction.js",
             "settings": {}
           }
         ]

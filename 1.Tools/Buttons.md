@@ -1,4 +1,6 @@
 
+<!-- SYSTEM-CHARACTERS-START -->
+
 ## 👥 Characters
 
 > [!column|2 no-t]
@@ -46,6 +48,16 @@
 > >   - type: command
 > >     command: quickadd:choice:a1b2c3d4-0001-4000-8000-000000000004
 > > ```
+> >
+> > ```meta-bind-button
+> > label: "Import Character from D&D Beyond"
+> > style: primary
+> > actions:
+> >   - type: command
+> >     command: quickadd:choice:a1b2c3d4-0001-4000-8000-000000000033
+> > ```
+
+<!-- SYSTEM-CHARACTERS-END -->
 
 ---
 
@@ -279,13 +291,14 @@
 
 ---
 
+<!-- SYSTEM-IMPORT-START -->
+
 ## 🗄️ Vault
 
 > [!column|3 no-t]
 >
 > > [!success|no-t] **Import Data**
 > >
-<!-- SYSTEM-IMPORT-START -->
 > > ```meta-bind-button
 > > label: "Import 5e.tools Data"
 > > style: primary
@@ -301,7 +314,6 @@
 > >   - type: command
 > >     command: quickadd:choice:a1b2c3d4-0001-4000-8000-000000000033
 > > ```
-<!-- SYSTEM-IMPORT-END -->
 > >
 > > Non-destructive — existing notes are never overwritten. Requires Python 3 and an internet connection.
 > >
@@ -326,7 +338,7 @@
 > >     command: quickadd:choice:a1b2c3d4-0001-4000-8000-000000000032
 > > ```
 > >
-> > 🎲 **Game System:** `$= const f = await app.vault.adapter.read("vault-config.json").catch(()=>"{}"); const c = JSON.parse(f); c.gameSystemName ?? "Not configured"`
+> > 🎲 **Game System:** D&D 5.5e (2024 / One D&D)
 > >
 > > 📦 **Vault version:** v`$= app.vault.adapter.read("version.json").then(f => JSON.parse(f).version)`
 > >
@@ -345,3 +357,5 @@
 > > ```
 > >
 > > Choose between **Campaign Data Only** or **Full Reset** (deletes everything). ⚠️ Files are permanently deleted and cannot be recovered.
+
+<!-- SYSTEM-IMPORT-END -->

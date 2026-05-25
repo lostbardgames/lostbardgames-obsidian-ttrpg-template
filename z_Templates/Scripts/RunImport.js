@@ -1,49 +1,103 @@
-const CONTENT_TYPES = [
+// ── Edition-specific content types ────────────────────────────────────────────
+// Must mirror CONTENT_TYPES_5E_2014 / CONTENT_TYPES_5E_2024 in import_5etools.py
+
+const CONTENT_TYPES_5E_2014 = [
   "spells", "items", "backgrounds", "classes", "classfeatures",
   "races", "racialtraits", "backgroundfeatures",
   "languages", "deities", "feats", "conditions", "optionalfeatures",
 ];
 
-const BOOKS = [
+const CONTENT_TYPES_5E_2024 = [
+  "spells", "items", "backgrounds", "classes", "classfeatures",
+  "races", "racialtraits",
+  "languages", "deities", "feats", "conditions", "optionalfeatures",
+];
+
+// Human-readable labels shown in the checkbox picker
+const TYPE_LABELS = {
+  spells:             "Spells",
+  items:              "Items",
+  backgrounds:        "Backgrounds",
+  classes:            "Classes",
+  classfeatures:      "Class Features",
+  races:              "Races / Species",
+  racialtraits:       "Racial Traits",
+  backgroundfeatures: "Background Features",
+  languages:          "Languages",
+  deities:            "Deities",
+  feats:              "Feats",
+  conditions:         "Conditions",
+  optionalfeatures:   "Optional Features",
+};
+
+// ── Edition-specific book lists ────────────────────────────────────────────────
+
+const BOOKS_5E_2014 = [
   // Core rules
-  { code: "PHB",       name: "Player's Handbook (2014)" },
-  { code: "XPHB",      name: "Player's Handbook (2024)" },
-  { code: "DMG",       name: "Dungeon Master's Guide (2014)" },
-  { code: "XDMG",      name: "Dungeon Master's Guide (2024)" },
-  { code: "MM",        name: "Monster Manual" },
-  { code: "SRD",       name: "SRD 5.1 (Creative Commons)" },
-  { code: "BasicRules",name: "Basic Rules" },
-  // Supplements
-  { code: "XGE",       name: "Xanathar's Guide to Everything" },
-  { code: "TCE",       name: "Tasha's Cauldron of Everything" },
-  { code: "SCAG",      name: "Sword Coast Adventurer's Guide" },
-  { code: "MTF",       name: "Mordenkainen's Tome of Foes" },
-  { code: "VGM",       name: "Volo's Guide to Monsters" },
-  { code: "MPMM",      name: "Mordenkainen Presents: Monsters of the Multiverse" },
-  { code: "FTD",       name: "Fizban's Treasury of Dragons" },
-  { code: "BGG",       name: "Bigby Presents: Glory of the Giants" },
-  { code: "MPP",       name: "Planescape: Adventures in the Multiverse" },
-  { code: "SCC",       name: "Strixhaven: A Curriculum of Chaos" },
+  { code: "PHB",        name: "Player's Handbook (2014)" },
+  { code: "DMG",        name: "Dungeon Master's Guide (2014)" },
+  { code: "MM",         name: "Monster Manual" },
+  { code: "SRD",        name: "SRD 5.1 (Creative Commons)" },
+  { code: "BasicRules", name: "Basic Rules" },
+  // Major supplements
+  { code: "XGE",        name: "Xanathar's Guide to Everything" },
+  { code: "TCE",        name: "Tasha's Cauldron of Everything" },
+  { code: "SCAG",       name: "Sword Coast Adventurer's Guide" },
+  { code: "MTF",        name: "Mordenkainen's Tome of Foes" },
+  { code: "VGM",        name: "Volo's Guide to Monsters" },
+  { code: "MPMM",       name: "Mordenkainen Presents: Monsters of the Multiverse" },
+  { code: "FTD",        name: "Fizban's Treasury of Dragons" },
+  { code: "BGG",        name: "Bigby Presents: Glory of the Giants" },
+  { code: "MPP",        name: "Planescape: Adventures in the Multiverse" },
+  { code: "SCC",        name: "Strixhaven: A Curriculum of Chaos" },
   // Setting guides
-  { code: "GGR",       name: "Guildmasters' Guide to Ravnica" },
-  { code: "ERLW",      name: "Eberron: Rising from the Last War" },
-  { code: "EGW",       name: "Explorer's Guide to Wildemount" },
-  { code: "MOT",       name: "Mythic Odysseys of Theros" },
-  { code: "AI",        name: "Acquisitions Incorporated" },
+  { code: "GGR",        name: "Guildmasters' Guide to Ravnica" },
+  { code: "ERLW",       name: "Eberron: Rising from the Last War" },
+  { code: "EGW",        name: "Explorer's Guide to Wildemount" },
+  { code: "MOT",        name: "Mythic Odysseys of Theros" },
+  { code: "AI",         name: "Acquisitions Incorporated" },
   // Adventures
-  { code: "CoS",       name: "Curse of Strahd" },
-  { code: "ToA",       name: "Tomb of Annihilation" },
-  { code: "SKT",       name: "Storm King's Thunder" },
-  { code: "WDH",       name: "Waterdeep: Dragon Heist" },
-  { code: "WDMM",      name: "Waterdeep: Dungeon of the Mad Mage" },
-  { code: "BGDIA",     name: "Baldur's Gate: Descent into Avernus" },
-  { code: "IDRotF",    name: "Icewind Dale: Rime of the Frostmaiden" },
-  { code: "WBtW",      name: "The Wild Beyond the Witchlight" },
-  { code: "CRCotN",    name: "Critical Role: Call of the Netherdeep" },
-  { code: "PaBTSO",    name: "Phandelver and Below: The Shattered Obelisk" },
-  { code: "DSotDQ",    name: "Dragonlance: Shadow of the Dragon Queen" },
-  { code: "KftGV",     name: "Keys from the Golden Vault" },
-  { code: "BMT",       name: "The Book of Many Things" },
+  { code: "CoS",        name: "Curse of Strahd" },
+  { code: "ToA",        name: "Tomb of Annihilation" },
+  { code: "SKT",        name: "Storm King's Thunder" },
+  { code: "WDH",        name: "Waterdeep: Dragon Heist" },
+  { code: "WDMM",       name: "Waterdeep: Dungeon of the Mad Mage" },
+  { code: "BGDIA",      name: "Baldur's Gate: Descent into Avernus" },
+  { code: "IDRotF",     name: "Icewind Dale: Rime of the Frostmaiden" },
+  { code: "WBtW",       name: "The Wild Beyond the Witchlight" },
+  { code: "CRCotN",     name: "Critical Role: Call of the Netherdeep" },
+  { code: "PaBTSO",     name: "Phandelver and Below: The Shattered Obelisk" },
+  { code: "DSotDQ",     name: "Dragonlance: Shadow of the Dragon Queen" },
+  { code: "KftGV",      name: "Keys from the Golden Vault" },
+  { code: "BMT",        name: "The Book of Many Things" },
+];
+
+const BOOKS_5E_2024 = [
+  // Core rulebooks (2024 revised editions)
+  { code: "XPHB",  name: "Player's Handbook (2024)" },
+  { code: "XDMG",  name: "Dungeon Master's Guide (2024)" },
+  { code: "XMM",   name: "Monster Manual (2024)" },
+  // Adventures & supplements (2024 edition)
+  { code: "QftIS", name: "Quests from the Infinite Staircase" },
+  // Pre-2024 supplements widely used alongside 2024 rules
+  { code: "XGE",   name: "Xanathar's Guide to Everything" },
+  { code: "TCE",   name: "Tasha's Cauldron of Everything" },
+  { code: "SCAG",  name: "Sword Coast Adventurer's Guide" },
+  { code: "MPMM",  name: "Mordenkainen Presents: Monsters of the Multiverse" },
+];
+
+// ── Source options (per edition) ───────────────────────────────────────────────
+
+const SOURCE_OPTIONS_5E_2014 = [
+  { label: "WotC Official — all official sourcebooks & adventures", value: "wotc"  },
+  { label: "Specific Books — choose exactly which books to import",  value: "books" },
+  { label: "All Sources — includes third-party and homebrew",        value: "all"   },
+];
+
+const SOURCE_OPTIONS_5E_2024 = [
+  { label: "WotC 2024 — core books + compatible supplements",       value: "wotc"  },
+  { label: "Specific Books — choose exactly which books to import",  value: "books" },
+  { label: "All Sources — includes third-party and homebrew",        value: "all"   },
 ];
 
 const PYTHON_FALLBACK_PATHS = {
@@ -62,23 +116,42 @@ module.exports = async (params) => {
     if (!python) return;
   }
 
-  // ── Source mode ────────────────────────────────────────────────────────────
-  const SRC_WOTC   = "📚  WotC Official — all WotC sourcebooks & adventures";
-  const SRC_BOOKS  = "🔖  Specific Books — choose exactly which books to import";
-  const SRC_ALL    = "🌐  All Sources — includes third-party and homebrew";
+  // ── Detect active game system ──────────────────────────────────────────────
+  const vaultPath = app.vault.adapter.basePath;
+  const path      = require("path");
+  const fs        = require("fs");
 
-  const srcChoice = await qa.suggester([SRC_WOTC, SRC_BOOKS, SRC_ALL], [SRC_WOTC, SRC_BOOKS, SRC_ALL]);
-  if (!srcChoice) return;
+  let gameSystem = "dnd5e";
+  try {
+    const cfgPath = path.join(vaultPath, "vault-config.json");
+    gameSystem    = JSON.parse(fs.readFileSync(cfgPath, "utf8")).gameSystem || "dnd5e";
+  } catch (e) {
+    console.warn("[RunImport] Could not read vault-config.json, defaulting to dnd5e:", e.message);
+  }
 
-  let sourceArg  = "";
-  let srcLabel   = "";
+  const is2024       = gameSystem === "dnd5e_2024";
+  const editionLabel = is2024 ? "D&D 5.5e (2024)" : "D&D 5e (2014)";
+  const systemArg    = `--system ${gameSystem}`;
+  const activeTypes  = is2024 ? CONTENT_TYPES_5E_2024 : CONTENT_TYPES_5E_2014;
+  const activeBooks  = is2024 ? BOOKS_5E_2024 : BOOKS_5E_2014;
+  const srcOptions   = is2024 ? SOURCE_OPTIONS_5E_2024 : SOURCE_OPTIONS_5E_2014;
+
+  // ── Step 1: Source mode ────────────────────────────────────────────────────
+  const srcValue = await qa.suggester(
+    srcOptions.map(o => o.label),
+    srcOptions.map(o => o.value)
+  );
+  if (!srcValue) return;
+
+  let sourceArg     = "";
+  let srcLabel      = "";
   let selectedBooks = null;
 
-  if (srcChoice === SRC_ALL) {
+  if (srcValue === "all") {
     sourceArg = "--all";
-    srcLabel  = "all sources";
-  } else if (srcChoice === SRC_BOOKS) {
-    selectedBooks = await multiSelectBooks(qa);
+    srcLabel  = "All Sources";
+  } else if (srcValue === "books") {
+    selectedBooks = await pickBooks(qa, activeBooks);
     if (!selectedBooks) return;
     if (selectedBooks.length === 0) {
       new Notice("No books selected. Import cancelled.");
@@ -88,40 +161,48 @@ module.exports = async (params) => {
     srcLabel  = selectedBooks.join(", ");
   } else {
     sourceArg = "";
-    srcLabel  = "WotC official";
+    srcLabel  = is2024 ? "WotC 2024" : "WotC Official";
   }
 
-  // ── Content type multi-select ──────────────────────────────────────────────
-  const selectedTypes = await multiSelectTypes(qa);
-  if (!selectedTypes) return;
-  if (selectedTypes.length === 0) {
+  // ── Step 2: Content types ──────────────────────────────────────────────────
+  const SELECT_ALL     = "☑  Select All";
+  const typeLabels     = [SELECT_ALL, ...activeTypes.map(t => TYPE_LABELS[t] || t)];
+  const selectedLabels = await qa.checkboxPrompt(typeLabels, typeLabels);
+  if (!selectedLabels || selectedLabels.length === 0) {
     new Notice("No content types selected. Import cancelled.");
     return;
   }
+  const selectedTypes = selectedLabels.includes(SELECT_ALL)
+    ? [...activeTypes]
+    : activeTypes.filter(t => selectedLabels.includes(TYPE_LABELS[t] || t));
 
-  // ── Confirm ────────────────────────────────────────────────────────────────
-  const typesLabel = selectedTypes.length === CONTENT_TYPES.length
+  // ── Step 3: Confirm ────────────────────────────────────────────────────────
+  const typesLabel = selectedTypes.length === activeTypes.length
     ? "all content types"
-    : selectedTypes.join(", ");
+    : selectedLabels.join(", ");
 
   const confirm = await qa.yesNoPrompt(
-    "Run 5e.tools Import?",
-    `Source: ${srcLabel}\nTypes: ${typesLabel}\n\nThis downloads data from 5e.tools and creates notes in your vault. Existing notes are never overwritten.\n\n⚠️ DISCLAIMER: You are responsible for ensuring you have a valid license or legal access to the content you import. This tool does not grant any rights to copyrighted material.\n\nContinue?`
+    `Run 5e.tools Import? (${editionLabel})`,
+    `Edition: ${editionLabel}\nSource: ${srcLabel}\nTypes: ${typesLabel}\n\nThis downloads data from 5e.tools and creates notes in your vault. Existing notes are never overwritten.\n\n⚠️ DISCLAIMER: You are responsible for ensuring you have a valid license or legal access to the content you import.\n\nContinue?`
   );
   if (!confirm) return;
 
-  // ── Build command ──────────────────────────────────────────────────────────
-  const path = require("path");
-  const vaultPath  = app.vault.adapter.basePath;
+  // ── Step 4: Build and run command ─────────────────────────────────────────
   const scriptPath = path.join(vaultPath, "import_5etools.py");
   const shellQuote = a => `"${String(a).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 
-  const typeArg = selectedTypes.length < CONTENT_TYPES.length
+  const typeArg = selectedTypes.length < activeTypes.length
     ? `--type ${selectedTypes.join(" ")}`
     : "";
-  const command = `${shellQuote(python)} ${shellQuote(scriptPath)} --vault ${shellQuote(vaultPath)} ${sourceArg} ${typeArg}`.trim();
+  const command = [
+    shellQuote(python),
+    shellQuote(scriptPath),
+    "--vault", shellQuote(vaultPath),
+    systemArg,
+    sourceArg,
+    typeArg,
+  ].filter(Boolean).join(" ");
 
-  // ── Run ────────────────────────────────────────────────────────────────────
   const startNotice = new Notice(
     `⏳ Importing ${typesLabel} (${srcLabel})… this may take a few minutes.`, 0
   );
@@ -138,73 +219,23 @@ module.exports = async (params) => {
     }
     const totalMatch = stdout.match(/Wrote (\d+) notes total/);
     const total = totalMatch ? totalMatch[1] : "?";
-    new Notice(
-      `✅ Import complete — ${total} notes written. Reloading vault…`,
-      5000
-    );
+    new Notice(`✅ Import complete — ${total} notes written. Reloading vault…`, 5000);
     console.log("[RunImport] output:\n", stdout);
     if (stderr?.trim()) console.warn("[RunImport] stderr:\n", stderr);
     setTimeout(() => app.commands.executeCommandById("app:reload"), 2000);
   });
 };
 
-// ── Multi-select type picker ───────────────────────────────────────────────────
-// Returns an array of selected type strings, or null if cancelled.
+// ── Book picker ────────────────────────────────────────────────────────────────
+// Shows a checkbox list of available books and returns selected source codes.
 
-async function multiSelectTypes(qa) {
-  const selected = new Set(CONTENT_TYPES); // default: all selected
-
-  while (true) {
-    const DONE     = `✔  Done  (${selected.size} / ${CONTENT_TYPES.length} selected)`;
-    const SEL_ALL  = "☰  Select All";
-    const CLR_ALL  = "☐  Clear All";
-
-    const rows = [
-      DONE, SEL_ALL, CLR_ALL,
-      ...CONTENT_TYPES.map(t => `${selected.has(t) ? "☑" : "☐"}  ${t}`),
-    ];
-
-    const choice = await qa.suggester(rows, rows);
-    if (!choice) return null; // Esc / cancelled
-
-    if (choice === DONE)    return [...selected];
-    if (choice === SEL_ALL) { CONTENT_TYPES.forEach(t => selected.add(t)); continue; }
-    if (choice === CLR_ALL) { selected.clear(); continue; }
-
-    // Strip the checkbox prefix to get the raw type name
-    const type = choice.replace(/^[☑☐]\s+/, "");
-    if (selected.has(type)) selected.delete(type);
-    else                    selected.add(type);
-  }
-}
-
-// ── Multi-select book picker ───────────────────────────────────────────────────
-// Returns an array of selected source code strings, or null if cancelled.
-
-async function multiSelectBooks(qa) {
-  const selected = new Set();
-
-  while (true) {
-    const DONE    = `✔  Done  (${selected.size} / ${BOOKS.length} selected)`;
-    const SEL_ALL = "☰  Select All";
-    const CLR_ALL = "☐  Clear All";
-
-    const rows = [
-      DONE, SEL_ALL, CLR_ALL,
-      ...BOOKS.map(b => `${selected.has(b.code) ? "☑" : "☐"}  ${b.code} — ${b.name}`),
-    ];
-
-    const choice = await qa.suggester(rows, rows);
-    if (!choice) return null;
-
-    if (choice === DONE)    return [...selected];
-    if (choice === SEL_ALL) { BOOKS.forEach(b => selected.add(b.code)); continue; }
-    if (choice === CLR_ALL) { selected.clear(); continue; }
-
-    const code = choice.replace(/^[☑☐]\s+/, "").split(" — ")[0];
-    if (selected.has(code)) selected.delete(code);
-    else                    selected.add(code);
-  }
+async function pickBooks(qa, books) {
+  const SELECT_ALL = "☑  Select All";
+  const labels     = [SELECT_ALL, ...books.map(b => `${b.code} — ${b.name}`)];
+  const selected   = await qa.checkboxPrompt(labels, []);
+  if (!selected) return null;
+  if (selected.includes(SELECT_ALL)) return books.map(b => b.code);
+  return selected.filter(l => l !== SELECT_ALL).map(l => l.split(" — ")[0]);
 }
 
 // ── Python detection ───────────────────────────────────────────────────────────

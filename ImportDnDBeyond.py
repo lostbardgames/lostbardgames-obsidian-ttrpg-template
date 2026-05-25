@@ -295,6 +295,15 @@ _PARENTHETICAL_PARENTS = frozenset([
     "Genasi", "Shifter", "Half-Elf", "Half-Orc", "Human",
 ])
 
+# ── Filename / link helpers ───────────────────────────────────────────────────
+
+def _sanitize_link(name: str) -> str:
+    """Replace characters illegal in filenames so a wikilink target matches the vault note."""
+    name = re.sub(r'[/\\:*?"<>|]', "-", name)
+    name = re.sub(r'\s+', " ", name).strip()
+    return name
+
+
 # ── Name-resolution helpers ────────────────────────────────────────────────────
 
 def _resolve_race_name(raw: str) -> str:
@@ -352,6 +361,29 @@ def _build_lore_index(vault_path: str) -> dict:
                     mapping[basename.lower()] = basename
         index[key] = mapping
     return index
+
+
+def _lore_exists(name: str, folder_key: str, lore_index: dict) -> bool:
+    """Return True if _lore_link would find a real file (not just a fallback link)."""
+    if not name:
+        return False
+    idx = lore_index.get(folder_key, {})
+    key = name.lower()
+    if name in idx.values():
+        return True
+    if key in idx:
+        return True
+    norm = re.sub(r"['''\-/]", " ", key)
+    norm = re.sub(r"\s+", " ", norm).strip()
+    for k in idx:
+        k_norm = re.sub(r"['''\-/]", " ", k)
+        k_norm = re.sub(r"\s+", " ", k_norm).strip()
+        if norm == k_norm:
+            return True
+    for k in idx:
+        if k.startswith(key) or key.startswith(k):
+            return True
+    return False
 
 
 def _lore_link(name: str, folder_key: str, lore_index: dict, display: str = "") -> str:
@@ -622,7 +654,10 @@ def main():
     def feat_link(name):
         # DDB appends class choices like "(Bard, Sorcerer, Warlock)"; strip for note resolution
         base = re.sub(r'\s*\([^)]*\)$', '', name).strip()
-        return f"[[{base}|{name}]]" if base != name else f"[[{name}]]"
+        safe = _sanitize_link(base)
+        if safe != name:
+            return f"[[{safe}|{name}]]"
+        return f"[[{safe}]]"
 
     feats_block = ("\n".join(f"- {feat_link(n)}" for n in feat_names)
                    if feat_names else "> *No feats found — add manually if this character has feats.*")
@@ -656,7 +691,12 @@ def main():
                 heading = f"**{cls_name} ({sub_name})**"
             else:
                 heading = f"**{cls_name}**"
-            lines = [f"- [[{name}]] *(Lv {lvl})*" for lvl, name in gained]
+            lines = [
+                f"- [[{_sanitize_link(name)}|{name}]] *(Lv {lvl})*"
+                if _sanitize_link(name) != name
+                else f"- [[{name}]] *(Lv {lvl})*"
+                for lvl, name in gained
+            ]
             feature_sections.append(heading + "\n" + "\n".join(lines))
 
     # Racial traits
@@ -671,13 +711,19 @@ def main():
             racial_traits.append(name)
     if racial_traits:
         race_heading = f"**{race_name} Racial Traits**" if race_name else "**Racial Traits**"
-        feature_sections.append(race_heading + "\n" + "\n".join(f"- [[{t}]]" for t in racial_traits))
+        trait_lines = [
+            f"- [[{_sanitize_link(t)}|{t}]]" if _sanitize_link(t) != t else f"- [[{t}]]"
+            for t in racial_traits
+        ]
+        feature_sections.append(race_heading + "\n" + "\n".join(trait_lines))
 
     # Background feature
     bg_feature = (bg_def.get("featureName") or "").strip().replace("'", "'").replace("'", "'") if bg_def else ""
     if bg_feature:
         bg_heading = f"**{bg_name} Background Feature**" if bg_name else "**Background Feature**"
-        feature_sections.append(f"{bg_heading}\n- [[{bg_feature}]]")
+        bg_feat_safe = _sanitize_link(bg_feature)
+        bg_feat_link = f"[[{bg_feat_safe}|{bg_feature}]]" if bg_feat_safe != bg_feature else f"[[{bg_feature}]]"
+        feature_sections.append(f"{bg_heading}\n- {bg_feat_link}")
 
     class_features_block = ("\n\n".join(feature_sections)
                             if feature_sections
@@ -769,6 +815,24 @@ def main():
     # Build vault-aware lore index so links resolve against files that actually exist.
     lore_index = _build_lore_index(vault_path)
 
+    # Determine which character-type folder the active system uses.
+    # Priority: (1) whichever folder actually contains the character's race note,
+    # (2) whichever folder has any content at all, (3) vault-config.json.
+    if _lore_exists(race_name, "races", lore_index):
+        _race_folder = "races"
+    elif _lore_exists(race_name, "species", lore_index):
+        _race_folder = "species"
+    elif lore_index.get("races"):
+        _race_folder = "races"
+    elif lore_index.get("species"):
+        _race_folder = "species"
+    else:
+        try:
+            _cfg = json.loads(open(os.path.join(vault_path, "vault-config.json")).read())
+            _race_folder = "species" if _cfg.get("gameSystem") == "dnd5e_2024" else "races"
+        except Exception:
+            _race_folder = "races"
+
     def link(val): return f"'[[{val}]]'" if val else "''"
     def lore_link(val, folder):
         return f"'{_lore_link(val, folder, lore_index)}'" if val else "''"
@@ -797,7 +861,7 @@ tags:
 art: "{art_field}"
 playedBy: ''
 aliases:
-species: {lore_link(race_name, "races") or lore_link(race_name, "species")}
+species: {lore_link(race_name, _race_folder)}
 class: {lore_link(primary_cls, "classes")}
 subclass: {subclass_link(primary_sub, primary_cls)}
 background: {lore_link(bg_name, "backgrounds")}

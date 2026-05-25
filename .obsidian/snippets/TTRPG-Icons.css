@@ -109,15 +109,31 @@
 .data-link-text[data-link-tags*="Subclass" i],
 .nav-file-title-content[data-link-tags*="Subclass" i] { color: #e67e22 !important; }
 
-/* Races / Species */
+/* Races / Species / Ancestries */
 .data-link-icon[data-link-tags*="Race" i]::before,
 .data-link-icon[data-link-tags*="Species" i]::before,
+.data-link-icon[data-link-tags*="Ancestry" i]::before,
 .nav-file-title-content[data-link-tags*="Race" i]::before,
-.nav-file-title-content[data-link-tags*="Species" i]::before { content: "🧬 "; }
+.nav-file-title-content[data-link-tags*="Species" i]::before,
+.nav-file-title-content[data-link-tags*="Ancestry" i]::before { content: "🧬 "; }
 .data-link-text[data-link-tags*="Race" i],
 .data-link-text[data-link-tags*="Species" i],
+.data-link-text[data-link-tags*="Ancestry" i],
 .nav-file-title-content[data-link-tags*="Race" i],
-.nav-file-title-content[data-link-tags*="Species" i] { color: #00cec9 !important; }
+.nav-file-title-content[data-link-tags*="Species" i],
+.nav-file-title-content[data-link-tags*="Ancestry" i] { color: #00cec9 !important; }
+
+/* Heritages (PF2e) */
+.data-link-icon[data-link-tags*="Heritage" i]::before,
+.nav-file-title-content[data-link-tags*="Heritage" i]::before { content: "🌿 "; }
+.data-link-text[data-link-tags*="Heritage" i],
+.nav-file-title-content[data-link-tags*="Heritage" i] { color: #55efc4 !important; }
+
+/* Actions (PF2e) */
+.data-link-icon[data-link-tags*="Action" i]::before,
+.nav-file-title-content[data-link-tags*="Action" i]::before { content: "⚡ "; }
+.data-link-text[data-link-tags*="Action" i],
+.nav-file-title-content[data-link-tags*="Action" i] { color: #fd9644 !important; }
 
 /* Backgrounds */
 .data-link-icon[data-link-tags*="Background" i]::before,
